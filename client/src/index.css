@@ -1,0 +1,239 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --font-sans: "Inter", sans-serif;
+  --font-display: "Space Grotesk", sans-serif;
+  
+  --radius-sm: 0.25rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+}
+
+:root {
+  /* Light Theme - Clean Editorial */
+  --color-background: hsl(60 10% 98%);
+  --color-foreground: hsl(220 15% 10%);
+  
+  --color-card: hsl(0 0% 100%);
+  --color-card-foreground: hsl(220 15% 10%);
+  
+  --color-popover: hsl(0 0% 100%);
+  --color-popover-foreground: hsl(220 15% 10%);
+  
+  /* Electric Lime Accent */
+  --color-primary: hsl(75 100% 40%);
+  --color-primary-foreground: hsl(0 0% 100%);
+  
+  --color-secondary: hsl(220 10% 92%);
+  --color-secondary-foreground: hsl(220 15% 15%);
+  
+  --color-muted: hsl(220 10% 95%);
+  --color-muted-foreground: hsl(220 10% 45%);
+  
+  --color-accent: hsl(220 10% 92%);
+  --color-accent-foreground: hsl(220 15% 15%);
+  
+  --color-destructive: hsl(0 62.8% 45%);
+  --color-destructive-foreground: hsl(0 0% 98%);
+  
+  --color-border: hsl(220 10% 88%);
+  --color-input: hsl(220 10% 88%);
+  --color-ring: hsl(75 100% 40%);
+}
+
+.dark {
+  /* Dark Luxury / Cyber Nomad Theme */
+  --color-background: hsl(220 15% 6%);
+  --color-foreground: hsl(0 0% 95%);
+  
+  --color-card: hsl(220 15% 10%);
+  --color-card-foreground: hsl(0 0% 95%);
+  
+  --color-popover: hsl(220 15% 10%);
+  --color-popover-foreground: hsl(0 0% 95%);
+  
+  /* Electric Lime Accent */
+  --color-primary: hsl(75 100% 55%);
+  --color-primary-foreground: hsl(0 0% 5%);
+  
+  --color-secondary: hsl(220 15% 15%);
+  --color-secondary-foreground: hsl(0 0% 98%);
+  
+  --color-muted: hsl(220 15% 15%);
+  --color-muted-foreground: hsl(220 10% 55%);
+  
+  --color-accent: hsl(220 15% 18%);
+  --color-accent-foreground: hsl(0 0% 98%);
+  
+  --color-destructive: hsl(0 62.8% 45%);
+  --color-destructive-foreground: hsl(0 0% 98%);
+  
+  --color-border: hsl(220 15% 18%);
+  --color-input: hsl(220 15% 18%);
+  --color-ring: hsl(75 100% 55%);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    @apply font-sans antialiased;
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+  }
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-display tracking-tight uppercase;
+  }
+}
+
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .glass-panel {
+    @apply backdrop-blur-xl border;
+  }
+  .dark .glass-panel {
+    @apply bg-black/80 border-white/10;
+  }
+  .light .glass-panel, :not(.dark) .glass-panel {
+    @apply bg-white/80 border-black/10;
+  }
+  
+  /* Smooth page transitions */
+  .page-enter {
+    animation: fadeSlideIn 0.4s ease-out;
+  }
+  
+  @keyframes fadeSlideIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  /* Skeleton loading animation */
+  .skeleton {
+    @apply animate-pulse rounded;
+  }
+  .dark .skeleton {
+    @apply bg-white/5;
+  }
+  :not(.dark) .skeleton {
+    @apply bg-black/5;
+  }
+  
+  /* Smooth card hover */
+  .card-hover {
+    @apply transition-all duration-500 ease-out;
+  }
+  .card-hover:hover {
+    @apply -translate-y-1;
+  }
+  
+  /* Text gradient */
+  .text-gradient {
+    background: linear-gradient(to right, var(--color-primary), #86efac, var(--color-primary));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+}
+
+/* Leaflet custom styles - Dark */
+.dark .leaflet-popup-content-wrapper {
+  background: hsl(220 15% 10%);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 0;
+  padding: 0;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}
+
+.dark .leaflet-popup-content {
+  margin: 0;
+  padding: 0;
+}
+
+.dark .leaflet-popup-tip {
+  background: hsl(220 15% 10%);
+}
+
+.dark .leaflet-container {
+  background: hsl(220 15% 6%) !important;
+}
+
+/* Leaflet custom styles - Light */
+:not(.dark) .leaflet-popup-content-wrapper {
+  background: white;
+  border: 1px solid rgba(0,0,0,0.1);
+  border-radius: 0;
+  padding: 0;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15);
+}
+
+:not(.dark) .leaflet-popup-content {
+  margin: 0;
+  padding: 0;
+}
+
+:not(.dark) .leaflet-popup-tip {
+  background: white;
+}
+
+:not(.dark) .leaflet-container {
+  background: hsl(60 10% 98%) !important;
+}
+
+/* Custom scrollbar - Dark */
+.dark::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.dark::-webkit-scrollbar-track {
+  background: hsl(220 15% 10%);
+}
+
+.dark::-webkit-scrollbar-thumb {
+  background: hsl(220 15% 25%);
+  border-radius: 3px;
+}
+
+.dark::-webkit-scrollbar-thumb:hover {
+  background: hsl(75 100% 55%);
+}
+
+/* Custom scrollbar - Light */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: hsl(220 10% 95%);
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(220 10% 75%);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(75 100% 40%);
+}
