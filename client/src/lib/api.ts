@@ -17,7 +17,9 @@ export const api = {
   },
 
   // Bookings
-  async createBooking(booking: InsertBooking): Promise<Booking> {
+  async createBooking(
+    booking: Omit<InsertBooking, "totalPrice">,
+  ): Promise<Booking> {
     const response = await fetch(`${API_BASE}/bookings`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

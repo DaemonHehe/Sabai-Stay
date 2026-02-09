@@ -1,8 +1,59 @@
-import type { Express } from "express";
-import { createServer, type Server } from "http";
+import type { Express, Request, Response } from "express";
+import type { Server } from "http";
 import { storage } from "./storage";
 import { insertListingSchema, insertBookingSchema } from "@shared/schema";
 import { z } from "zod";
+
+const availabilitySchema = z
+  .object({
+    checkIn: z.coerce.date(),
+    checkOut: z.coerce.date(),
+  })
+  .refine((data) => data.checkIn < data.checkOut, {
+    message: "Check-out must be after check-in",
+    path: ["checkOut"],
+  });
+
+const bookingRequestSchema = insertBookingSchema
+  .omit({ totalPrice: true })
+  .extend({
+    guests: z.coerce.number().int().min(1).default(1),
+  })
+  .refine((data) => data.checkIn < data.checkOut, {
+    message: "Check-out must be after check-in",
+    path: ["checkOut"],
+  });
+
+function formatZodError(error: z.ZodError) {
+  return error.errors
+    .map((detail) => {
+      const path = detail.path.join(".") || "input";
+      return `${path}: ${detail.message}`;
+    })
+    .join(", ");
+}
+
+function requireAdmin(req: Request, res: Response): boolean {
+  const adminKey = process.env.ADMIN_API_KEY;
+  const isProd = process.env.NODE_ENV === "production";
+
+  if (!adminKey && !isProd) {
+    return false;
+  }
+
+  if (!adminKey) {
+    res.status(403).json({ error: "Admin API key not configured" });
+    return true;
+  }
+
+  const providedKey = req.header("x-admin-key");
+  if (providedKey !== adminKey) {
+    res.status(401).json({ error: "Unauthorized" });
+    return true;
+  }
+
+  return false;
+}
 
 export async function registerRoutes(
   httpServer: Server,
@@ -37,13 +88,16 @@ export async function registerRoutes(
   // Create listing (admin only - no auth for now)
   app.post("/api/listings", async (req, res) => {
     try {
+      if (requireAdmin(req, res)) {
+        return;
+      }
+
       const validatedData = insertListingSchema.parse(req.body);
       const listing = await storage.createListing(validatedData);
       res.status(201).json(listing);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        const errorMessage = error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ');
-        return res.status(400).json({ error: errorMessage });
+        return res.status(400).json({ error: formatZodError(error) });
       }
       console.error("Error creating listing:", error);
       res.status(500).json({ error: "Failed to create listing" });
@@ -53,20 +107,24 @@ export async function registerRoutes(
   // Check availability
   app.post("/api/listings/:id/check-availability", async (req, res) => {
     try {
-      const { checkIn, checkOut } = req.body;
-      
-      if (!checkIn || !checkOut) {
-        return res.status(400).json({ error: "Check-in and check-out dates are required" });
+      const listing = await storage.getListingById(req.params.id);
+      if (!listing) {
+        return res.status(404).json({ error: "Listing not found" });
       }
+
+      const { checkIn, checkOut } = availabilitySchema.parse(req.body);
 
       const available = await storage.checkAvailability(
         req.params.id,
-        new Date(checkIn),
-        new Date(checkOut)
+        checkIn,
+        checkOut,
       );
 
       res.json({ available });
     } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: formatZodError(error) });
+      }
       console.error("Error checking availability:", error);
       res.status(500).json({ error: "Failed to check availability" });
     }
@@ -75,7 +133,12 @@ export async function registerRoutes(
   // Create booking
   app.post("/api/bookings", async (req, res) => {
     try {
-      const validatedData = insertBookingSchema.parse(req.body);
+      const validatedData = bookingRequestSchema.parse(req.body);
+
+      const listing = await storage.getListingById(validatedData.listingId);
+      if (!listing) {
+        return res.status(404).json({ error: "Listing not found" });
+      }
       
       // Check availability first
       const available = await storage.checkAvailability(
@@ -88,12 +151,14 @@ export async function registerRoutes(
         return res.status(409).json({ error: "Room is not available for selected dates" });
       }
 
-      const booking = await storage.createBooking(validatedData);
+      const booking = await storage.createBooking({
+        ...validatedData,
+        totalPrice: listing.price,
+      });
       res.status(201).json(booking);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        const errorMessage = error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ');
-        return res.status(400).json({ error: errorMessage });
+        return res.status(400).json({ error: formatZodError(error) });
       }
       console.error("Error creating booking:", error);
       res.status(500).json({ error: "Failed to create booking" });

@@ -91,7 +91,6 @@ export default function ListingDetails() {
       checkIn: new Date(bookingData.checkIn),
       checkOut: new Date(bookingData.checkOut),
       guests: bookingData.guests,
-      totalPrice: listing.price,
     });
   };
 

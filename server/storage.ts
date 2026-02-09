@@ -1,3 +1,4 @@
+import "../env";
 import { drizzle } from "drizzle-orm/node-postgres";
 import pg from "pg";
 import { 
@@ -8,9 +9,13 @@ import {
   type Booking,
   type InsertBooking
 } from "@shared/schema";
-import { eq, and, gte, lte } from "drizzle-orm";
+import { eq, and, gt, lt } from "drizzle-orm";
 
 const { Pool } = pg;
+
+if (!process.env.DATABASE_URL) {
+  throw new Error("DATABASE_URL is required");
+}
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -67,17 +72,22 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
-  async checkAvailability(listingId: string, checkIn: Date, checkOut: Date): Promise<boolean> {
+  async checkAvailability(
+    listingId: string,
+    checkIn: Date,
+    checkOut: Date,
+  ): Promise<boolean> {
     // Check for any overlapping bookings
-    const overlapping = await db.select()
+    const overlapping = await db
+      .select()
       .from(bookings)
       .where(
         and(
           eq(bookings.listingId, listingId),
           // Booking overlaps if: new check-in < existing check-out AND new check-out > existing check-in
-          gte(bookings.checkOut, checkIn),
-          lte(bookings.checkIn, checkOut)
-        )
+          gt(bookings.checkOut, checkIn),
+          lt(bookings.checkIn, checkOut),
+        ),
       );
     
     return overlapping.length === 0;
