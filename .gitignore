@@ -7,9 +7,6 @@ coverage/
 .vite/
 .local/
 
-# env files
-.env
-.env.*
 
 # logs
 npm-debug.log*
