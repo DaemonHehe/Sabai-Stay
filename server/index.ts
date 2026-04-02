@@ -2,6 +2,7 @@ import "../env";
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
+import { initializeStorage } from "./storage";
 import { createServer } from "http";
 
 const app = express();
@@ -51,6 +52,7 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  await initializeStorage();
   await registerRoutes(httpServer, app);
 
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
@@ -85,7 +87,6 @@ app.use((req, res, next) => {
     {
       port,
       host: "0.0.0.0",
-      reusePort: true,
     },
     () => {
       log(`serving on port ${port}`);

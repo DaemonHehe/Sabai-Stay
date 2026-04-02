@@ -59,7 +59,21 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  
+  app.get("/api/config/public", (_req, res) => {
+    const supabaseUrl =
+      process.env.SUPABASE_URL ?? process.env.EXPO_PUBLIC_SUPABASE_URL ?? null;
+    const supabaseAnonKey =
+      process.env.SUPABASE_ANON_KEY ??
+      process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ??
+      null;
+
+    res.json({
+      configured: Boolean(supabaseUrl && supabaseAnonKey),
+      supabaseUrl,
+      supabaseAnonKey,
+    });
+  });
+
   // Get all listings
   app.get("/api/listings", async (req, res) => {
     try {
