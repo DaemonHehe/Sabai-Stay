@@ -241,6 +241,17 @@ export async function requireSupabaseBrowserClient() {
   return client;
 }
 
+export async function getSupabaseAccessToken() {
+  const client = await getSupabaseBrowserClient();
+  if (!client) {
+    return null;
+  }
+
+  const { data, error } = await client.auth.getSession();
+  throwSupabaseError(error);
+  return data.session?.access_token ?? null;
+}
+
 export async function listUniversities(): Promise<University[]> {
   const client = await requireSupabaseBrowserClient();
   const { data, error } = await client

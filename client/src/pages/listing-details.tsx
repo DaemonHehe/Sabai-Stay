@@ -1,50 +1,79 @@
-import { Layout } from "@/components/layout";
-import { useRoute, Link } from "wouter";
-import { Button } from "@/components/ui/button";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useRoute } from "wouter";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import {
-  Star,
-  MapPin,
   ArrowLeft,
-  Wifi,
-  Car,
-  Coffee,
-  Tv,
-  Bath,
-  Wind,
-  CheckCircle2,
-  GraduationCap,
+  Bus,
+  CalendarDays,
+  CircleAlert,
+  MapPin,
+  Star,
 } from "lucide-react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { api } from "@/lib/api";
-import { useEffect, useState } from "react";
-import { useToast } from "@/hooks/use-toast";
-import NotFound from "./not-found";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+import { Layout } from "@/components/layout";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { useAuth } from "@/contexts/auth-context";
+import { Textarea } from "@/components/ui/textarea";
+import { api } from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
+import { queryClient } from "@/lib/queryClient";
+import NotFound from "./not-found";
 
-const amenities = [
-  { icon: Wifi, label: "High-Speed WiFi" },
-  { icon: Car, label: "Parking" },
-  { icon: Coffee, label: "Kitchen" },
-  { icon: Tv, label: "Smart TV" },
-  { icon: Bath, label: "Private Bath" },
-  { icon: Wind, label: "Air Conditioning" },
-];
+function BookingModal({
+  open,
+  onClose,
+  children,
+}: {
+  open: boolean;
+  onClose: () => void;
+  children: React.ReactNode;
+}) {
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [open]);
+
+  if (!open) {
+    return null;
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) {
+          onClose();
+        }
+      }}
+    >
+      <div
+        className="w-full max-w-lg rounded-sm border p-6"
+        style={{
+          backgroundColor: "var(--color-card)",
+          borderColor: "var(--color-border)",
+        }}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
 
 export default function ListingDetails() {
   const [, params] = useRoute("/listing/:id");
   const { toast } = useToast();
-  const { user, profile } = useAuth();
   const [isBookingOpen, setIsBookingOpen] = useState(false);
+  const [utilityUsage, setUtilityUsage] = useState({
+    electricityUsageUnits: 120,
+    waterUsageUnits: 12,
+  });
   const [bookingData, setBookingData] = useState({
     guestName: "",
     guestEmail: "",
@@ -52,20 +81,49 @@ export default function ListingDetails() {
     checkIn: "",
     checkOut: "",
     guests: 1,
+    requestNote: "",
   });
+  const [reviewData, setReviewData] = useState({
+    studentUserId: "student-001",
+    studentName: "Current Student",
+    rating: 5,
+    comment: "",
+  });
+  const [ownerResponseDraft, setOwnerResponseDraft] = useState<Record<string, string>>({});
 
   const { data: listing, isLoading } = useQuery({
     queryKey: ["listing", params?.id],
     queryFn: () => api.getListing(params!.id),
-    enabled: !!params?.id,
+    enabled: Boolean(params?.id),
+  });
+  const { data: discovery } = useQuery({
+    queryKey: ["discovery"],
+    queryFn: api.getDiscovery,
+  });
+  const { data: reviews = [] } = useQuery({
+    queryKey: ["reviews", params?.id],
+    queryFn: () => api.getReviews(params!.id),
+    enabled: Boolean(params?.id),
+  });
+  const { data: utilityEstimate } = useQuery({
+    queryKey: ["utility-estimate", params?.id, utilityUsage],
+    queryFn: () =>
+      api.estimateUtilities(
+        params!.id,
+        utilityUsage.electricityUsageUnits,
+        utilityUsage.waterUsageUnits,
+      ),
+    enabled: Boolean(params?.id),
   });
 
   const bookingMutation = useMutation({
     mutationFn: api.createBooking,
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       toast({
-        title: "Booking Confirmed!",
-        description: "We'll send you a confirmation email shortly.",
+        title: "Booking request submitted",
+        description:
+          "The request now enters the owner approval and deposit workflow.",
       });
       setIsBookingOpen(false);
       setBookingData({
@@ -75,64 +133,57 @@ export default function ListingDetails() {
         checkIn: "",
         checkOut: "",
         guests: 1,
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Booking Failed",
-        description: error.message,
-        variant: "destructive",
+        requestNote: "",
       });
     },
   });
 
-  const handleBooking = () => {
-    if (!listing) {
-      return;
-    }
-
-    if (
-      !bookingData.guestName ||
-      !bookingData.guestEmail ||
-      !bookingData.guestPhone ||
-      !bookingData.checkIn ||
-      !bookingData.checkOut
-    ) {
+  const reviewMutation = useMutation({
+    mutationFn: api.createReview,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["reviews", params?.id] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       toast({
-        title: "Missing Information",
-        description: "Please fill in all fields",
-        variant: "destructive",
+        title: "Review submitted",
+        description: "Reviews and owner responses are now part of the listing trust flow.",
       });
-      return;
-    }
+      setReviewData((current) => ({ ...current, comment: "", rating: 5 }));
+    },
+  });
 
-    bookingMutation.mutate({
-      listingId: listing.id,
-      guestName: bookingData.guestName,
-      guestEmail: bookingData.guestEmail,
-      guestPhone: bookingData.guestPhone,
-      checkIn: new Date(bookingData.checkIn),
-      checkOut: new Date(bookingData.checkOut),
-      guests: bookingData.guests,
-    });
-  };
+  const reviewResponseMutation = useMutation({
+    mutationFn: ({ id, response }: { id: string; response: string }) =>
+      api.respondToReview(id, response),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["reviews", params?.id] });
+      toast({
+        title: "Owner response saved",
+        description: "The review thread now includes the landlord reply.",
+      });
+    },
+  });
 
-  useEffect(() => {
-    if (!user && !profile) {
-      return;
-    }
+  const zone = useMemo(
+    () =>
+      discovery?.campusZones.find(
+        (item) => item.id === listing?.nearestCampusZoneId,
+      ) ?? null,
+    [discovery?.campusZones, listing?.nearestCampusZoneId],
+  );
+  const routes = useMemo(
+    () =>
+      discovery?.transportRoutes.filter((route) =>
+        listing?.transportRouteIds.includes(route.id),
+      ) ?? [],
+    [discovery?.transportRoutes, listing?.transportRouteIds],
+  );
 
-    setBookingData((current) => ({
-      ...current,
-      guestName:
-        current.guestName ||
-        profile?.appUser.fullName ||
-        user?.user_metadata?.full_name ||
-        "",
-      guestEmail: current.guestEmail || user?.email || "",
-      guestPhone: current.guestPhone || profile?.appUser.phone || "",
-    }));
-  }, [profile?.appUser.fullName, profile?.appUser.phone, user]);
+  const averageRating =
+    reviews.length > 0
+      ? (
+          reviews.reduce((total, review) => total + review.rating, 0) / reviews.length
+        ).toFixed(1)
+      : listing?.rating ?? "0.0";
 
   if (isLoading) {
     return (
@@ -171,28 +222,32 @@ export default function ListingDetails() {
             className="w-full h-full object-cover"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent" />
-
-          <div className="absolute top-6 left-6">
-            <div className="bg-primary text-primary-foreground font-mono text-xs font-bold px-3 py-1.5 uppercase tracking-wider">
-              {listing.category}
-            </div>
-          </div>
-
           <div className="absolute bottom-0 left-0 w-full p-6 md:p-10">
             <div className="container mx-auto">
-              <div className="max-w-3xl">
+              <div className="max-w-4xl">
                 <div className="flex items-center gap-3 text-white/60 text-sm mb-3">
                   <MapPin className="h-4 w-4" />
                   <span>{listing.location}</span>
-                  <span className="px-2">{"\u2022"}</span>
+                  <span className="px-2">•</span>
                   <div className="flex items-center gap-1">
                     <Star className="h-4 w-4 fill-primary text-primary" />
-                    <span>{listing.rating}</span>
+                    <span>{averageRating}</span>
                   </div>
                 </div>
                 <h1 className="text-3xl md:text-5xl lg:text-6xl font-display font-bold text-white leading-tight">
                   {listing.title}
                 </h1>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <span className="bg-primary text-primary-foreground px-3 py-1 text-[10px] font-mono uppercase tracking-[0.2em]">
+                    {listing.category}
+                  </span>
+                  <span className="bg-black/50 text-white px-3 py-1 text-[10px] font-mono uppercase tracking-[0.2em]">
+                    {listing.roomType}
+                  </span>
+                  <span className="bg-black/50 text-white px-3 py-1 text-[10px] font-mono uppercase tracking-[0.2em]">
+                    {listing.walkingMinutes} min walk
+                  </span>
+                </div>
               </div>
             </div>
           </div>
@@ -208,323 +263,454 @@ export default function ListingDetails() {
                   borderColor: "var(--color-border)",
                 }}
               >
-                <div className="p-2 bg-primary/20 rounded-full">
-                  <GraduationCap className="h-5 w-5 text-primary" />
+                <div className="p-2 bg-primary/20 rounded-full shrink-0">
+                  <CircleAlert className="h-5 w-5 text-primary" />
                 </div>
                 <div>
-                  <p className="font-display font-bold">
-                    Near Rangsit University
-                  </p>
+                  <p className="font-display font-bold">Transparent Listing Data</p>
                   <p className="text-sm opacity-60">
-                    Approx. 5-15 min walk to campus
+                    This listing now exposes utility rates, lease options, campus-zone proximity, and transport routes instead of fabricated details.
                   </p>
                 </div>
               </div>
 
-              <div>
-                <h2 className="text-lg font-display font-bold uppercase mb-4 flex items-center gap-2">
-                  <div className="w-1 h-5 bg-primary" />
+              <section>
+                <h2 className="text-lg font-display font-bold uppercase mb-4">
                   About This Place
                 </h2>
                 <p className="opacity-70 leading-relaxed text-base">
                   {listing.description}
                 </p>
-              </div>
+              </section>
 
-              <div>
-                <h2 className="text-lg font-display font-bold uppercase mb-6 flex items-center gap-2">
-                  <div className="w-1 h-5 bg-primary" />
-                  Amenities
+              <section>
+                <h2 className="text-lg font-display font-bold uppercase mb-4">
+                  Amenities And Lease Terms
                 </h2>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  {amenities.map((amenity) => (
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div
+                    className="rounded-sm border p-5"
+                    style={{
+                      backgroundColor: "var(--color-secondary)",
+                      borderColor: "var(--color-border)",
+                    }}
+                  >
+                    <p className="font-display font-bold">Amenities</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {listing.amenities.map((amenity) => (
+                        <span
+                          key={amenity}
+                          className="rounded-full border px-3 py-1 text-[10px] font-mono uppercase tracking-wider"
+                          style={{ borderColor: "var(--color-border)" }}
+                        >
+                          {amenity}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <div
+                    className="rounded-sm border p-5"
+                    style={{
+                      backgroundColor: "var(--color-secondary)",
+                      borderColor: "var(--color-border)",
+                    }}
+                  >
+                    <p className="font-display font-bold">Lease Options</p>
+                    <div className="mt-3 space-y-2 text-sm opacity-70">
+                      {listing.leaseOptions.map((option) => (
+                        <p key={option.months}>
+                          {option.label} · {option.months} month(s)
+                        </p>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <section>
+                <h2 className="text-lg font-display font-bold uppercase mb-4">
+                  Campus Navigation
+                </h2>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div
+                    className="rounded-sm border p-5"
+                    style={{
+                      backgroundColor: "var(--color-secondary)",
+                      borderColor: "var(--color-border)",
+                    }}
+                  >
+                    <p className="font-display font-bold">Nearest Campus Zone</p>
+                    <p className="mt-3 text-lg">{zone?.name ?? "Campus zone unavailable"}</p>
+                    <p className="mt-2 text-sm opacity-70">
+                      {zone?.description ?? "No zone description is available for this listing."}
+                    </p>
+                    <p className="mt-2 text-sm font-mono opacity-60">
+                      Approx. {listing.walkingMinutes} minutes on foot
+                    </p>
+                  </div>
+                  <div
+                    className="rounded-sm border p-5"
+                    style={{
+                      backgroundColor: "var(--color-secondary)",
+                      borderColor: "var(--color-border)",
+                    }}
+                  >
+                    <p className="font-display font-bold">Transport Routes</p>
+                    <div className="mt-3 space-y-3">
+                      {routes.map((route) => (
+                        <div key={route.id} className="flex items-start gap-3 text-sm">
+                          <Bus className="h-4 w-4 text-primary mt-0.5" />
+                          <div>
+                            <p className="font-semibold">{route.name}</p>
+                            <p className="opacity-60">{route.description}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <section>
+                <h2 className="text-lg font-display font-bold uppercase mb-4">
+                  Reviews
+                </h2>
+                <div className="space-y-4">
+                  {reviews.map((review) => (
                     <div
-                      key={amenity.label}
-                      className="flex items-center gap-3 p-3 rounded-sm border"
+                      key={review.id}
+                      className="rounded-sm border p-5"
                       style={{
                         backgroundColor: "var(--color-secondary)",
                         borderColor: "var(--color-border)",
                       }}
                     >
-                      <amenity.icon className="h-5 w-5 text-primary" />
-                      <span className="text-sm opacity-80">
-                        {amenity.label}
-                      </span>
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="font-semibold">{review.studentName}</p>
+                          <p className="text-sm opacity-60">{review.rating}/5</p>
+                        </div>
+                        <p className="text-xs font-mono opacity-40">
+                          {review.createdAt.toLocaleDateString()}
+                        </p>
+                      </div>
+                      <p className="mt-3 text-sm opacity-80">{review.comment}</p>
+                      {review.ownerResponse ? (
+                        <div
+                          className="mt-4 rounded-sm border p-3 text-sm"
+                          style={{ borderColor: "var(--color-border)" }}
+                        >
+                          <p className="font-semibold">Owner response</p>
+                          <p className="mt-2 opacity-70">{review.ownerResponse}</p>
+                        </div>
+                      ) : (
+                        <div className="mt-4 space-y-2">
+                          <Textarea
+                            placeholder="Write an owner response"
+                            value={ownerResponseDraft[review.id] ?? ""}
+                            onChange={(event) =>
+                              setOwnerResponseDraft((current) => ({
+                                ...current,
+                                [review.id]: event.target.value,
+                              }))
+                            }
+                          />
+                          <Button
+                            variant="outline"
+                            onClick={() =>
+                              reviewResponseMutation.mutate({
+                                id: review.id,
+                                response: ownerResponseDraft[review.id] ?? "",
+                              })
+                            }
+                            disabled={!ownerResponseDraft[review.id]?.trim()}
+                          >
+                            Post Owner Response
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
-              </div>
 
-              <div>
-                <h2 className="text-lg font-display font-bold uppercase mb-6 flex items-center gap-2">
-                  <div className="w-1 h-5 bg-primary" />
-                  Gallery
-                </h2>
-                <div className="grid grid-cols-2 gap-3">
-                  <img
-                    src="/images/condo-pool.png"
-                    alt={`${listing.title} pool`}
-                    className="aspect-square object-cover rounded-sm hover:opacity-80 transition-opacity cursor-pointer"
-                  />
-                  <img
-                    src="/images/co-working.png"
-                    alt={`${listing.title} common area`}
-                    className="aspect-square object-cover rounded-sm hover:opacity-80 transition-opacity cursor-pointer"
-                  />
+                <div
+                  className="mt-6 rounded-sm border p-5"
+                  style={{
+                    backgroundColor: "var(--color-secondary)",
+                    borderColor: "var(--color-border)",
+                  }}
+                >
+                  <p className="font-display font-bold uppercase">Leave a review</p>
+                  <div className="mt-4 space-y-3">
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <Input
+                        value={reviewData.studentName}
+                        onChange={(event) =>
+                          setReviewData((current) => ({
+                            ...current,
+                            studentName: event.target.value,
+                          }))
+                        }
+                      />
+                      <Input
+                        type="number"
+                        min={1}
+                        max={5}
+                        value={reviewData.rating}
+                        onChange={(event) =>
+                          setReviewData((current) => ({
+                            ...current,
+                            rating: Number(event.target.value),
+                          }))
+                        }
+                      />
+                    </div>
+                    <Textarea
+                      placeholder="Share your stay experience"
+                      value={reviewData.comment}
+                      onChange={(event) =>
+                        setReviewData((current) => ({
+                          ...current,
+                          comment: event.target.value,
+                        }))
+                      }
+                    />
+                    <Button
+                      onClick={() =>
+                        reviewMutation.mutate({
+                          listingId: listing.id,
+                          studentUserId: reviewData.studentUserId,
+                          studentName: reviewData.studentName,
+                          rating: reviewData.rating,
+                          comment: reviewData.comment,
+                        })
+                      }
+                      disabled={!reviewData.comment.trim()}
+                    >
+                      Submit Review
+                    </Button>
+                  </div>
                 </div>
-              </div>
+              </section>
             </div>
 
             <div className="lg:col-span-5">
-              <div
-                className="sticky top-28 p-6 md:p-8 border backdrop-blur-sm rounded-sm"
-                style={{
-                  backgroundColor: "var(--color-card)",
-                  borderColor: "var(--color-border)",
-                }}
-              >
+              <div className="sticky top-28 space-y-6">
                 <div
-                  className="flex items-end justify-between mb-6 pb-6 border-b"
-                  style={{ borderColor: "var(--color-border)" }}
+                  className="p-6 md:p-8 border backdrop-blur-sm rounded-sm"
+                  style={{
+                    backgroundColor: "var(--color-card)",
+                    borderColor: "var(--color-border)",
+                  }}
                 >
-                  <div>
-                    <div className="text-3xl md:text-4xl font-display font-bold text-primary">
-                      {"\u0E3F"}
-                      {listing.price.toLocaleString()}
-                    </div>
-                    <div className="font-mono text-xs opacity-40 mt-1">
-                      PER MONTH
-                    </div>
-                  </div>
                   <div
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full"
-                    style={{ backgroundColor: "var(--color-secondary)" }}
+                    className="flex items-end justify-between mb-6 pb-6 border-b"
+                    style={{ borderColor: "var(--color-border)" }}
                   >
-                    <Star className="h-4 w-4 fill-primary text-primary" />
-                    <span className="text-sm font-mono">{listing.rating}</span>
+                    <div>
+                      <div className="text-3xl md:text-4xl font-display font-bold text-primary">
+                        ฿{listing.price.toLocaleString()}
+                      </div>
+                      <div className="font-mono text-xs opacity-40 mt-1">PER MONTH</div>
+                    </div>
+                    <div className="text-right text-sm opacity-60">
+                      <p>{listing.capacity} guests</p>
+                      <p>{listing.areaSqm} sqm</p>
+                    </div>
                   </div>
+
+                  <Button
+                    onClick={() => setIsBookingOpen(true)}
+                    className="w-full h-14 bg-primary text-primary-foreground font-display font-bold text-base uppercase tracking-widest hover:opacity-90 transition-opacity rounded-sm"
+                  >
+                    Request Booking
+                  </Button>
+
+                  <p className="mt-4 text-center text-xs opacity-40 font-mono">
+                    Workflow: Request → Approval → Deposit → Confirmed
+                  </p>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4 mb-6">
-                  <div
-                    className="p-3 rounded-sm text-center"
-                    style={{ backgroundColor: "var(--color-secondary)" }}
-                  >
-                    <div className="text-xl font-display font-bold">1</div>
-                    <div className="text-[10px] font-mono opacity-40 uppercase">
-                      Bedroom
+                <div
+                  className="rounded-sm border p-6"
+                  style={{
+                    backgroundColor: "var(--color-card)",
+                    borderColor: "var(--color-border)",
+                  }}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="font-display font-bold uppercase">
+                        Utility Calculator
+                      </p>
+                      <p className="mt-1 text-sm opacity-60">
+                        Estimate the real monthly total before you commit.
+                      </p>
                     </div>
+                    <CalendarDays className="h-5 w-5 text-primary" />
                   </div>
-                  <div
-                    className="p-3 rounded-sm text-center"
-                    style={{ backgroundColor: "var(--color-secondary)" }}
-                  >
-                    <div className="text-xl font-display font-bold">2</div>
-                    <div className="text-[10px] font-mono opacity-40 uppercase">
-                      Max Guests
-                    </div>
+                  <div className="mt-4 grid gap-3 md:grid-cols-2">
+                    <Input
+                      type="number"
+                      value={utilityUsage.electricityUsageUnits}
+                      onChange={(event) =>
+                        setUtilityUsage((current) => ({
+                          ...current,
+                          electricityUsageUnits: Number(event.target.value),
+                        }))
+                      }
+                    />
+                    <Input
+                      type="number"
+                      value={utilityUsage.waterUsageUnits}
+                      onChange={(event) =>
+                        setUtilityUsage((current) => ({
+                          ...current,
+                          waterUsageUnits: Number(event.target.value),
+                        }))
+                      }
+                    />
                   </div>
-                </div>
-
-                <Dialog open={isBookingOpen} onOpenChange={setIsBookingOpen}>
-                  <DialogTrigger asChild>
-                    <Button
-                      className="w-full h-14 bg-primary text-primary-foreground font-display font-bold text-base uppercase tracking-widest hover:opacity-90 transition-opacity rounded-sm"
-                      data-testid="button-reserve"
+                  <div className="mt-4 space-y-2 text-sm opacity-70">
+                    <p>
+                      Electricity rate: ฿{listing.utilityRates.electricityPerUnit}/unit
+                    </p>
+                    <p>Water rate: ฿{listing.utilityRates.waterPerUnit}/unit</p>
+                    <p>
+                      Internet:{" "}
+                      {listing.internetIncluded
+                        ? "Included"
+                        : `฿${listing.utilityRates.internetFee}`}
+                    </p>
+                    <p>Service fee: ฿{listing.utilityRates.serviceFee}</p>
+                  </div>
+                  {utilityEstimate ? (
+                    <div
+                      className="mt-4 rounded-sm border p-4"
+                      style={{ borderColor: "var(--color-border)" }}
                     >
-                      Reserve Now
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent
-                    className="border max-w-md"
-                    style={{
-                      backgroundColor: "var(--color-card)",
-                      borderColor: "var(--color-border)",
-                    }}
-                  >
-                    <DialogHeader>
-                      <DialogTitle className="font-display text-2xl uppercase">
-                        Book Your Room
-                      </DialogTitle>
-                      <DialogDescription className="opacity-60 space-y-1">
-                        <span className="block">
-                          Complete your reservation for {listing.title}
-                        </span>
-                        {user && (
-                          <span className="block text-primary">
-                            Signed in as {user.email}. Profile details are
-                            pre-filled from Supabase.
-                          </span>
-                        )}
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4 mt-4">
-                      <div>
-                        <Label htmlFor="name" className="opacity-80 text-sm">
-                          Full Name
-                        </Label>
-                        <Input
-                          id="name"
-                          placeholder="Enter your name"
-                          value={bookingData.guestName}
-                          onChange={(event) =>
-                            setBookingData({
-                              ...bookingData,
-                              guestName: event.target.value,
-                            })
-                          }
-                          className="border mt-1.5 h-11"
-                          style={{
-                            backgroundColor: "var(--color-secondary)",
-                            borderColor: "var(--color-border)",
-                          }}
-                          data-testid="input-name"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="email" className="opacity-80 text-sm">
-                          Email Address
-                        </Label>
-                        <Input
-                          id="email"
-                          type="email"
-                          placeholder="your@email.com"
-                          value={bookingData.guestEmail}
-                          onChange={(event) =>
-                            setBookingData({
-                              ...bookingData,
-                              guestEmail: event.target.value,
-                            })
-                          }
-                          className="border mt-1.5 h-11"
-                          style={{
-                            backgroundColor: "var(--color-secondary)",
-                            borderColor: "var(--color-border)",
-                          }}
-                          data-testid="input-email"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="phone" className="opacity-80 text-sm">
-                          Phone Number
-                        </Label>
-                        <Input
-                          id="phone"
-                          placeholder="+66 XX XXX XXXX"
-                          value={bookingData.guestPhone}
-                          onChange={(event) =>
-                            setBookingData({
-                              ...bookingData,
-                              guestPhone: event.target.value,
-                            })
-                          }
-                          className="border mt-1.5 h-11"
-                          style={{
-                            backgroundColor: "var(--color-secondary)",
-                            borderColor: "var(--color-border)",
-                          }}
-                          data-testid="input-phone"
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <Label
-                            htmlFor="checkIn"
-                            className="opacity-80 text-sm"
-                          >
-                            Move In
-                          </Label>
-                          <Input
-                            id="checkIn"
-                            type="date"
-                            value={bookingData.checkIn}
-                            onChange={(event) =>
-                              setBookingData({
-                                ...bookingData,
-                                checkIn: event.target.value,
-                              })
-                            }
-                            className="border mt-1.5 h-11"
-                            style={{
-                              backgroundColor: "var(--color-secondary)",
-                              borderColor: "var(--color-border)",
-                            }}
-                            data-testid="input-checkin"
-                          />
-                        </div>
-                        <div>
-                          <Label
-                            htmlFor="checkOut"
-                            className="opacity-80 text-sm"
-                          >
-                            Move Out
-                          </Label>
-                          <Input
-                            id="checkOut"
-                            type="date"
-                            value={bookingData.checkOut}
-                            onChange={(event) =>
-                              setBookingData({
-                                ...bookingData,
-                                checkOut: event.target.value,
-                              })
-                            }
-                            className="border mt-1.5 h-11"
-                            style={{
-                              backgroundColor: "var(--color-secondary)",
-                              borderColor: "var(--color-border)",
-                            }}
-                            data-testid="input-checkout"
-                          />
-                        </div>
-                      </div>
-                      <Button
-                        onClick={handleBooking}
-                        disabled={bookingMutation.isPending}
-                        className="w-full h-12 bg-primary text-primary-foreground hover:opacity-90 font-display font-bold uppercase tracking-widest rounded-sm mt-2"
-                        data-testid="button-confirm-booking"
-                      >
-                        {bookingMutation.isPending ? (
-                          <span className="flex items-center gap-2">
-                            <div className="w-4 h-4 border-2 border-current/30 border-t-current rounded-full animate-spin" />
-                            Processing...
-                          </span>
-                        ) : (
-                          "Confirm Booking"
-                        )}
-                      </Button>
+                      <p className="text-sm opacity-60">Estimated Monthly Utilities</p>
+                      <p className="mt-2 font-display text-3xl font-bold text-primary">
+                        ฿{utilityEstimate.total.toLocaleString()}
+                      </p>
                     </div>
-                  </DialogContent>
-                </Dialog>
-
-                <p className="text-center text-xs opacity-40 mt-4 font-mono">
-                  No payment required now
-                </p>
-
-                <div
-                  className="mt-6 pt-6 border-t space-y-3"
-                  style={{ borderColor: "var(--color-border)" }}
-                >
-                  <div className="flex items-center gap-3 text-sm">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    <span className="opacity-70">Instant confirmation</span>
-                  </div>
-                  <div className="flex items-center gap-3 text-sm">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    <span className="opacity-70">
-                      Free cancellation within 48hrs
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-3 text-sm">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    <span className="opacity-70">24/7 support</span>
-                  </div>
+                  ) : null}
                 </div>
               </div>
             </div>
           </div>
         </div>
       </div>
+
+      <BookingModal open={isBookingOpen} onClose={() => setIsBookingOpen(false)}>
+        <div className="space-y-4">
+          <div>
+            <p className="font-display text-2xl font-bold uppercase">
+              Booking Request
+            </p>
+            <p className="mt-2 text-sm opacity-60">
+              Your request starts the approval, deposit, and contract workflow.
+            </p>
+          </div>
+          <Input
+            placeholder="Full Name"
+            value={bookingData.guestName}
+            onChange={(event) =>
+              setBookingData((current) => ({
+                ...current,
+                guestName: event.target.value,
+              }))
+            }
+          />
+          <Input
+            placeholder="Email"
+            value={bookingData.guestEmail}
+            onChange={(event) =>
+              setBookingData((current) => ({
+                ...current,
+                guestEmail: event.target.value,
+              }))
+            }
+          />
+          <Input
+            placeholder="Phone"
+            value={bookingData.guestPhone}
+            onChange={(event) =>
+              setBookingData((current) => ({
+                ...current,
+                guestPhone: event.target.value,
+              }))
+            }
+          />
+          <div className="grid gap-3 md:grid-cols-2">
+            <Input
+              type="date"
+              value={bookingData.checkIn}
+              onChange={(event) =>
+                setBookingData((current) => ({
+                  ...current,
+                  checkIn: event.target.value,
+                }))
+              }
+            />
+            <Input
+              type="date"
+              value={bookingData.checkOut}
+              onChange={(event) =>
+                setBookingData((current) => ({
+                  ...current,
+                  checkOut: event.target.value,
+                }))
+              }
+            />
+          </div>
+          <Input
+            type="number"
+            min={1}
+            value={bookingData.guests}
+            onChange={(event) =>
+              setBookingData((current) => ({
+                ...current,
+                guests: Number(event.target.value),
+              }))
+            }
+          />
+          <Textarea
+            placeholder="Request note for the landlord"
+            value={bookingData.requestNote}
+            onChange={(event) =>
+              setBookingData((current) => ({
+                ...current,
+                requestNote: event.target.value,
+              }))
+            }
+          />
+          <Button
+            className="w-full"
+            onClick={() =>
+              bookingMutation.mutate({
+                listingId: listing.id,
+                guestName: bookingData.guestName,
+                guestEmail: bookingData.guestEmail,
+                guestPhone: bookingData.guestPhone,
+                checkIn: new Date(bookingData.checkIn),
+                checkOut: new Date(bookingData.checkOut),
+                guests: bookingData.guests,
+                requestNote: bookingData.requestNote,
+              })
+            }
+            disabled={
+              !bookingData.guestName ||
+              !bookingData.guestEmail ||
+              !bookingData.guestPhone ||
+              !bookingData.checkIn ||
+              !bookingData.checkOut
+            }
+          >
+            Submit Request
+          </Button>
+        </div>
+      </BookingModal>
     </Layout>
   );
 }

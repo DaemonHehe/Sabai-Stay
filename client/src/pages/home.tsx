@@ -1,16 +1,26 @@
+import { lazy, Suspense } from "react";
 import { Layout } from "@/components/layout";
-import { MapView } from "@/components/map-view";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useSearchParams } from "wouter";
 import { filterListingsByQuery } from "@/lib/listing-search";
 
+const MapView = lazy(() =>
+  import("@/components/map-view").then((module) => ({
+    default: module.MapView,
+  })),
+);
+
 export default function Home() {
   const [searchParams] = useSearchParams();
   const searchQuery = searchParams.get("q") ?? "";
   const { data: listings = [], isLoading } = useQuery({
-    queryKey: ["listings"],
-    queryFn: api.getListings,
+    queryKey: ["listings", searchQuery],
+    queryFn: () => api.getListings({ q: searchQuery }),
+  });
+  const { data: discovery } = useQuery({
+    queryKey: ["discovery"],
+    queryFn: api.getDiscovery,
   });
 
   const filteredListings = filterListingsByQuery(listings, searchQuery);
@@ -26,7 +36,19 @@ export default function Home() {
   return (
     <Layout noPadding>
       <div className="h-screen w-full relative">
-        <MapView searchQuery={searchQuery} />
+        <Suspense
+          fallback={
+            <div className="h-full w-full flex items-center justify-center">
+              <div className="flex items-center gap-3">
+                <div className="w-2 h-2 bg-primary rounded-full animate-bounce [animation-delay:-0.3s]" />
+                <div className="w-2 h-2 bg-primary rounded-full animate-bounce [animation-delay:-0.15s]" />
+                <div className="w-2 h-2 bg-primary rounded-full animate-bounce" />
+              </div>
+            </div>
+          }
+        >
+          <MapView searchQuery={searchQuery} />
+        </Suspense>
 
         <div className="absolute top-24 left-4 md:left-6 z-[1000] max-w-sm pointer-events-auto">
           <div
@@ -43,7 +65,8 @@ export default function Home() {
                 <span className="text-primary">Student Room</span>
               </h1>
               <p className="opacity-50 text-sm mt-2 font-light">
-                Near Rangsit University
+                {discovery?.campusZones.length ?? 0} campus zones ·{" "}
+                {discovery?.transportRoutes.length ?? 0} transport routes
               </p>
             </div>
 

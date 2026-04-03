@@ -17,6 +17,8 @@ export function filterListingsByQuery(listings: Listing[], query: string) {
       listing.location,
       listing.category,
       listing.description,
+      listing.roomType,
+      ...listing.amenities,
     ].some((value) => value.toLowerCase().includes(normalizedQuery)),
   );
 }

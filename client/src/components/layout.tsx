@@ -1,16 +1,31 @@
+import { lazy, Suspense, useState } from "react";
 import { Search, Map as MapIcon, List, X, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link, useLocation, useSearchParams } from "wouter";
-import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
-import { ThemeToggle } from "@/components/theme-toggle";
-import { AuthDialog } from "@/components/auth-dialog";
-import {
-  Sheet,
-  SheetContent,
-  SheetTrigger,
-} from "@/components/ui/sheet";
+import { AuthControl } from "@/components/auth-control";
+
+const ThemeToggle = lazy(() =>
+  import("@/components/theme-toggle").then((module) => ({
+    default: module.ThemeToggle,
+  })),
+);
+function HeaderControlFallback({
+  label,
+}: {
+  label: string;
+}) {
+  return (
+    <div
+      className="h-10 min-w-10 sm:min-w-[2.5rem] rounded-full bg-secondary/50 border px-3 flex items-center justify-center text-[10px] font-mono uppercase tracking-wider opacity-50"
+      style={{ borderColor: "var(--color-border)" }}
+      aria-hidden="true"
+    >
+      {label}
+    </div>
+  );
+}
 
 export function Layout({
   children,
@@ -22,6 +37,7 @@ export function Layout({
   const [location] = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const [searchOpen, setSearchOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const searchQuery = searchParams.get("q") ?? "";
 
   const handleSearchChange = (value: string) => {
@@ -99,6 +115,18 @@ export function Layout({
                 LIST
               </button>
             </Link>
+            <Link href="/dashboard">
+              <button
+                className={cn(
+                  "px-5 py-2 rounded-full font-mono text-xs tracking-wider transition-all",
+                  location === "/dashboard"
+                    ? "bg-primary text-primary-foreground font-bold"
+                    : "opacity-70 hover:opacity-100 hover:bg-secondary",
+                )}
+              >
+                DASH
+              </button>
+            </Link>
           </nav>
 
           <div className="flex items-center gap-2">
@@ -114,55 +142,22 @@ export function Layout({
               )}
             </button>
 
-            <ThemeToggle />
+            <Suspense fallback={<HeaderControlFallback label="Theme" />}>
+              <ThemeToggle />
+            </Suspense>
 
-            <AuthDialog />
+            <AuthControl />
 
-            <Sheet>
-              <SheetTrigger asChild>
-                <button
-                  className="md:hidden h-10 w-10 rounded-full bg-secondary/50 border flex items-center justify-center hover:bg-secondary transition-colors"
-                  style={{ borderColor: "var(--color-border)" }}
-                >
-                  <Menu className="h-4 w-4" />
-                </button>
-              </SheetTrigger>
-              <SheetContent
-                side="right"
-                className="border-l w-[280px]"
-                style={{
-                  backgroundColor: "var(--color-background)",
-                  borderColor: "var(--color-border)",
-                }}
-              >
-                <nav className="flex flex-col gap-4 mt-8">
-                  <Link href="/">
-                    <div
-                      className={cn(
-                        "px-4 py-3 font-display text-xl uppercase tracking-wide border-l-2 transition-all",
-                        location === "/"
-                          ? "border-primary text-primary"
-                          : "border-transparent opacity-60 hover:opacity-100",
-                      )}
-                    >
-                      Map View
-                    </div>
-                  </Link>
-                  <Link href="/list">
-                    <div
-                      className={cn(
-                        "px-4 py-3 font-display text-xl uppercase tracking-wide border-l-2 transition-all",
-                        location === "/list"
-                          ? "border-primary text-primary"
-                          : "border-transparent opacity-60 hover:opacity-100",
-                      )}
-                    >
-                      All Rooms
-                    </div>
-                  </Link>
-                </nav>
-              </SheetContent>
-            </Sheet>
+            <button
+              type="button"
+              onClick={() => setMenuOpen(true)}
+              className="md:hidden h-10 w-10 rounded-full bg-secondary/50 border flex items-center justify-center hover:bg-secondary transition-colors"
+              style={{ borderColor: "var(--color-border)" }}
+              aria-expanded={menuOpen}
+              aria-controls="mobile-nav"
+            >
+              <Menu className="h-4 w-4" />
+            </button>
           </div>
         </div>
 
@@ -193,6 +188,83 @@ export function Layout({
       >
         {children}
       </main>
+
+      {menuOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-black/70 md:hidden"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              setMenuOpen(false);
+            }
+          }}
+        >
+          <div
+            id="mobile-nav"
+            className="absolute right-0 top-0 h-full w-[280px] border-l p-6"
+            style={{
+              backgroundColor: "var(--color-background)",
+              borderColor: "var(--color-border)",
+            }}
+          >
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => setMenuOpen(false)}
+                className="h-10 w-10 rounded-full border flex items-center justify-center"
+                style={{ borderColor: "var(--color-border)" }}
+                aria-label="Close menu"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <nav className="flex flex-col gap-4 mt-8">
+              <Link href="/">
+                <button
+                  type="button"
+                  onClick={() => setMenuOpen(false)}
+                  className={cn(
+                    "w-full text-left px-4 py-3 font-display text-xl uppercase tracking-wide border-l-2 transition-all",
+                    location === "/"
+                      ? "border-primary text-primary"
+                      : "border-transparent opacity-60 hover:opacity-100",
+                  )}
+                >
+                  Map View
+                </button>
+              </Link>
+              <Link href="/list">
+                <button
+                  type="button"
+                  onClick={() => setMenuOpen(false)}
+                  className={cn(
+                    "w-full text-left px-4 py-3 font-display text-xl uppercase tracking-wide border-l-2 transition-all",
+                    location === "/list"
+                      ? "border-primary text-primary"
+                      : "border-transparent opacity-60 hover:opacity-100",
+                  )}
+                >
+                  All Rooms
+                </button>
+              </Link>
+              <Link href="/dashboard">
+                <button
+                  type="button"
+                  onClick={() => setMenuOpen(false)}
+                  className={cn(
+                    "w-full text-left px-4 py-3 font-display text-xl uppercase tracking-wide border-l-2 transition-all",
+                    location === "/dashboard"
+                      ? "border-primary text-primary"
+                      : "border-transparent opacity-60 hover:opacity-100",
+                  )}
+                >
+                  Dashboard
+                </button>
+              </Link>
+            </nav>
+          </div>
+        </div>
+      )}
 
       {location !== "/listing" && !location.includes("/listing/") && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 md:hidden">

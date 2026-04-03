@@ -1,11 +1,4 @@
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-  type ReactNode,
-} from "react";
+import { useEffect, useSyncExternalStore } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import type { AuthProfile, UserRole } from "@shared/schema";
 import {
@@ -28,7 +21,6 @@ export type SignUpInput = {
   email: string;
   password: string;
   universityId?: string;
-  universityEmail?: string;
   studentNumber?: string;
   roommateOptIn?: boolean;
   businessName?: string;
@@ -39,19 +31,60 @@ type SignUpResult = {
   needsEmailConfirmation: boolean;
 };
 
-type AuthContextValue = {
+type AuthState = {
   isConfigured: boolean;
   isLoading: boolean;
   session: Session | null;
-  user: User | null;
   profile: AuthProfile | null;
+};
+
+type AuthContextValue = AuthState & {
+  user: User | null;
   signIn: (input: SignInInput) => Promise<void>;
   signUp: (input: SignUpInput) => Promise<SignUpResult>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<AuthProfile | null>;
 };
 
-const AuthContext = createContext<AuthContextValue | null>(null);
+const subscribers = new Set<() => void>();
+const initialState: AuthState = {
+  isConfigured: false,
+  isLoading: true,
+  session: null,
+  profile: null,
+};
+
+let authState = initialState;
+let initializePromise: Promise<void> | null = null;
+let authSubscriptionCleanup: (() => void) | null = null;
+let hasInitialized = false;
+
+function emitAuthState(nextState: AuthState) {
+  authState = nextState;
+
+  subscribers.forEach((subscriber) => {
+    subscriber();
+  });
+}
+
+function updateAuthState(partialState: Partial<AuthState>) {
+  emitAuthState({
+    ...authState,
+    ...partialState,
+  });
+}
+
+function subscribe(callback: () => void) {
+  subscribers.add(callback);
+
+  return () => {
+    subscribers.delete(callback);
+  };
+}
+
+function getSnapshot() {
+  return authState;
+}
 
 async function resolveProfile(userId: string) {
   const profile = await waitForAuthProfile(userId);
@@ -65,208 +98,220 @@ async function resolveProfile(userId: string) {
   return profile;
 }
 
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [isConfigured, setIsConfigured] = useState(false);
-  const [session, setSession] = useState<Session | null>(null);
-  const [profile, setProfile] = useState<AuthProfile | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+async function syncSession(nextSession: Session | null) {
+  updateAuthState({
+    session: nextSession,
+  });
 
-  useEffect(() => {
-    let isActive = true;
+  if (!nextSession?.user) {
+    updateAuthState({
+      profile: null,
+      isLoading: false,
+    });
+    return;
+  }
 
-    async function syncSession(nextSession: Session | null) {
-      if (!isActive) {
+  updateAuthState({
+    isLoading: true,
+  });
+
+  try {
+    const nextProfile = await resolveProfile(nextSession.user.id);
+    updateAuthState({
+      profile: nextProfile,
+    });
+  } catch (error) {
+    console.error("Failed to load auth profile:", error);
+    updateAuthState({
+      profile: null,
+    });
+  } finally {
+    updateAuthState({
+      isLoading: false,
+    });
+  }
+}
+
+export async function initializeAuth() {
+  if (hasInitialized) {
+    return;
+  }
+
+  if (initializePromise) {
+    return initializePromise;
+  }
+
+  initializePromise = (async () => {
+    try {
+      const client = await getSupabaseBrowserClient();
+      if (!client) {
+        updateAuthState({
+          isConfigured: false,
+          session: null,
+          profile: null,
+          isLoading: false,
+        });
         return;
       }
 
-      setSession(nextSession);
+      updateAuthState({
+        isConfigured: true,
+      });
 
-      if (!nextSession?.user) {
-        setProfile(null);
-        setIsLoading(false);
-        return;
-      }
-
-      setIsLoading(true);
-
-      try {
-        const nextProfile = await resolveProfile(nextSession.user.id);
-        if (!isActive) {
-          return;
-        }
-
-        setProfile(nextProfile);
-      } catch (error) {
-        if (!isActive) {
-          return;
-        }
-
-        console.error("Failed to load auth profile:", error);
-        setProfile(null);
-      } finally {
-        if (isActive) {
-          setIsLoading(false);
-        }
-      }
-    }
-
-    async function initializeAuth() {
-      try {
-        const client = await getSupabaseBrowserClient();
-        if (!client) {
-          if (isActive) {
-            setIsConfigured(false);
-            setSession(null);
-            setProfile(null);
-            setIsLoading(false);
-          }
-          return;
-        }
-
-        if (isActive) {
-          setIsConfigured(true);
-        }
-
-        const { data, error } = await client.auth.getSession();
-        if (error) {
-          throw error;
-        }
-
-        await syncSession(data.session);
-
+      if (!authSubscriptionCleanup) {
         const { data: subscription } = client.auth.onAuthStateChange(
           (_event, nextSession) => {
             void syncSession(nextSession);
           },
         );
 
-        if (!isActive) {
-          subscription.subscription.unsubscribe();
-          return;
-        }
-
-        cleanup = () => {
+        authSubscriptionCleanup = () => {
           subscription.subscription.unsubscribe();
         };
-      } catch (error) {
-        console.error("Failed to initialize Supabase auth:", error);
-        if (isActive) {
-          setIsConfigured(false);
-          setSession(null);
-          setProfile(null);
-          setIsLoading(false);
-        }
       }
+
+      const { data, error } = await client.auth.getSession();
+      if (error) {
+        throw error;
+      }
+
+      await syncSession(data.session);
+      hasInitialized = true;
+    } catch (error) {
+      console.error("Failed to initialize Supabase auth:", error);
+      updateAuthState({
+        isConfigured: false,
+        session: null,
+        profile: null,
+        isLoading: false,
+      });
+    } finally {
+      initializePromise = null;
     }
+  })();
 
-    let cleanup = () => {};
-    void initializeAuth();
-
-    return () => {
-      isActive = false;
-      cleanup();
-    };
-  }, []);
-
-  const value = useMemo<AuthContextValue>(
-    () => ({
-      isConfigured,
-      isLoading,
-      session,
-      user: session?.user ?? null,
-      profile,
-      async signIn(input) {
-        const client = await requireSupabaseBrowserClient();
-
-        const { error } = await client.auth.signInWithPassword({
-          email: input.email,
-          password: input.password,
-        });
-
-        if (error) {
-          throw new Error(error.message);
-        }
-      },
-      async signUp(input) {
-        const client = await requireSupabaseBrowserClient();
-
-        const metadata: Record<string, unknown> = {
-          role: input.role,
-          full_name: input.fullName,
-          phone: input.phone?.trim() || undefined,
-        };
-
-        if (input.role === "student") {
-          metadata.university_id = input.universityId || undefined;
-          metadata.university_email = input.universityEmail?.trim() || undefined;
-          metadata.student_number = input.studentNumber?.trim() || undefined;
-          metadata.roommate_opt_in = Boolean(input.roommateOptIn);
-        }
-
-        if (input.role === "owner") {
-          metadata.business_name = input.businessName?.trim() || undefined;
-          metadata.business_registration_number =
-            input.businessRegistrationNumber?.trim() || undefined;
-        }
-
-        const { data, error } = await client.auth.signUp({
-          email: input.email,
-          password: input.password,
-          options: {
-            data: metadata,
-            emailRedirectTo: window.location.origin,
-          },
-        });
-
-        if (error) {
-          throw new Error(error.message);
-        }
-
-        if (data.session?.user) {
-          const nextProfile = await resolveProfile(data.session.user.id);
-          setSession(data.session);
-          setProfile(nextProfile);
-        }
-
-        return {
-          needsEmailConfirmation: !data.session,
-        };
-      },
-      async signOut() {
-        const client = await requireSupabaseBrowserClient();
-
-        const { error } = await client.auth.signOut();
-        if (error) {
-          throw new Error(error.message);
-        }
-
-        setSession(null);
-        setProfile(null);
-      },
-      async refreshProfile() {
-        const currentUser = session?.user;
-        if (!currentUser) {
-          setProfile(null);
-          return null;
-        }
-
-        const nextProfile = await resolveProfile(currentUser.id);
-        setProfile(nextProfile);
-        return nextProfile;
-      },
-    }),
-    [isConfigured, isLoading, profile, session],
-  );
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return initializePromise;
 }
 
-export function useAuth() {
-  const context = useContext(AuthContext);
+export async function loadAuthSessionDetails() {
+  await initializeAuth();
 
-  if (!context) {
-    throw new Error("useAuth must be used within an AuthProvider.");
+  return {
+    user: authState.session?.user ?? null,
+    profile: authState.profile,
+  };
+}
+
+async function signIn(input: SignInInput) {
+  await initializeAuth();
+
+  const client = await requireSupabaseBrowserClient();
+  const { error } = await client.auth.signInWithPassword({
+    email: input.email,
+    password: input.password,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+async function signUp(input: SignUpInput): Promise<SignUpResult> {
+  await initializeAuth();
+
+  const client = await requireSupabaseBrowserClient();
+
+  const metadata: Record<string, unknown> = {
+    role: input.role,
+    full_name: input.fullName,
+    phone: input.phone?.trim() || undefined,
+  };
+
+  if (input.role === "student") {
+    metadata.university_id = input.universityId || undefined;
+    metadata.student_number = input.studentNumber?.trim() || undefined;
+    metadata.roommate_opt_in = Boolean(input.roommateOptIn);
   }
 
-  return context;
+  if (input.role === "owner") {
+    metadata.business_name = input.businessName?.trim() || undefined;
+    metadata.business_registration_number =
+      input.businessRegistrationNumber?.trim() || undefined;
+  }
+
+  const { data, error } = await client.auth.signUp({
+    email: input.email,
+    password: input.password,
+    options: {
+      data: metadata,
+      emailRedirectTo: window.location.origin,
+    },
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  if (data.session?.user) {
+    const nextProfile = await resolveProfile(data.session.user.id);
+    updateAuthState({
+      session: data.session,
+      profile: nextProfile,
+    });
+  }
+
+  return {
+    needsEmailConfirmation: !data.session,
+  };
+}
+
+async function signOut() {
+  await initializeAuth();
+
+  const client = await requireSupabaseBrowserClient();
+  const { error } = await client.auth.signOut();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  updateAuthState({
+    session: null,
+    profile: null,
+  });
+}
+
+async function refreshProfile() {
+  await initializeAuth();
+
+  const currentUser = authState.session?.user;
+  if (!currentUser) {
+    updateAuthState({
+      profile: null,
+    });
+    return null;
+  }
+
+  const nextProfile = await resolveProfile(currentUser.id);
+  updateAuthState({
+    profile: nextProfile,
+  });
+  return nextProfile;
+}
+
+export function useAuth(): AuthContextValue {
+  const state = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+
+  useEffect(() => {
+    void initializeAuth();
+  }, []);
+
+  return {
+    ...state,
+    user: state.session?.user ?? null,
+    signIn,
+    signUp,
+    signOut,
+    refreshProfile,
+  };
 }

@@ -22,6 +22,44 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes("node_modules")) {
+            return undefined;
+          }
+
+          if (
+            id.includes("react-leaflet") ||
+            id.includes("leaflet")
+          ) {
+            return "map-vendor";
+          }
+
+          if (id.includes("@supabase/")) {
+            return "supabase-vendor";
+          }
+
+          if (id.includes("@tanstack/react-query")) {
+            return "query-vendor";
+          }
+
+          if (
+            id.includes("@radix-ui/") ||
+            id.includes("cmdk") ||
+            id.includes("vaul")
+          ) {
+            return "ui-vendor";
+          }
+
+          if (id.includes("lucide-react")) {
+            return "icon-vendor";
+          }
+
+          return undefined;
+        },
+      },
+    },
   },
   server: {
     host: "0.0.0.0",

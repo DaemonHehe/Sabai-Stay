@@ -4,9 +4,8 @@ import {
   Marker,
   Popup,
   ZoomControl,
-  Circle,
 } from "react-leaflet";
-import { divIcon, LatLngExpression } from "leaflet";
+import { divIcon, type LatLngTuple } from "leaflet";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
@@ -16,7 +15,7 @@ import { filterListingsByQuery } from "@/lib/listing-search";
 
 import "leaflet/dist/leaflet.css";
 
-const RSU_COORDS: LatLngExpression = [13.9649, 100.5878];
+const RSU_COORDS: LatLngTuple = [13.9649, 100.5878];
 
 const createCustomIcon = (price: number, isDark: boolean) => {
   const bgColor = isDark ? "black" : "white";
@@ -67,8 +66,8 @@ export function MapView({
   const isDark = resolvedTheme === "dark";
 
   const { data: listings = [], isLoading } = useQuery({
-    queryKey: ["listings"],
-    queryFn: api.getListings,
+    queryKey: ["listings", searchQuery],
+    queryFn: () => api.getListings({ q: searchQuery }),
   });
   const filteredListings = filterListingsByQuery(listings, searchQuery);
 
@@ -78,40 +77,22 @@ export function MapView({
 
   return (
     <div className={`h-full w-full relative z-0 ${className}`}>
-      {/* @ts-ignore - Leaflet types mismatch */}
       <MapContainer
         center={RSU_COORDS}
-        zoom={14}
-        scrollWheelZoom={true}
+        zoom={14 as number}
+        scrollWheelZoom
         className="h-full w-full outline-none"
         zoomControl={false}
         key={resolvedTheme}
       >
-        {/* @ts-ignore */}
         <ZoomControl position="bottomright" />
 
-        {/* @ts-ignore - Leaflet types mismatch */}
         <TileLayer
           attribution='&copy; <a href="https://carto.com/attributions">CARTO</a>'
           url={tileUrl}
         />
 
-        {/* @ts-ignore */}
-        <Circle
-          center={RSU_COORDS}
-          radius={800}
-          pathOptions={{
-            color: isDark ? "#c8ff00" : "#5a8f00",
-            fillColor: isDark ? "#c8ff00" : "#5a8f00",
-            fillOpacity: 0.08,
-            weight: 1,
-            dashArray: "5, 10",
-          }}
-        />
-
-        {/* @ts-ignore */}
         <Marker position={RSU_COORDS} icon={createUniversityIcon(isDark)}>
-          {/* @ts-ignore */}
           <Popup className="custom-popup" closeButton={false}>
             <div
               className="p-3 text-center"
@@ -133,15 +114,13 @@ export function MapView({
 
         {filteredListings.map((listing) => (
           <Marker
-            // @ts-ignore - Leaflet types mismatch
             key={listing.id}
             position={[
               parseFloat(listing.latitude),
               parseFloat(listing.longitude),
-            ]}
+            ] as LatLngTuple}
             icon={createCustomIcon(listing.price, isDark)}
           >
-            {/* @ts-ignore - Leaflet types mismatch */}
             <Popup className="custom-popup" closeButton={false}>
               <Link href={`/listing/${listing.id}`}>
                 <div

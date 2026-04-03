@@ -50,13 +50,23 @@ export function ListingCard({
                 {listing.title}
               </h3>
               <div className="flex items-center justify-between pt-2 border-t border-white/10">
-                <div className="flex items-baseline gap-1">
+              <div className="flex items-baseline gap-1">
                   <span className="text-primary font-display font-bold text-xl">
                     {"\u0E3F"}
                     {listing.price.toLocaleString()}
                   </span>
                   <span className="text-white/40 text-xs font-mono">/mo</span>
                 </div>
+                <div className="text-right">
+                  <p className="text-[10px] font-mono uppercase tracking-wider text-white/60">
+                    {listing.roomType} · {listing.capacity}p
+                  </p>
+                  <p className="text-[10px] font-mono uppercase tracking-wider text-primary">
+                    {listing.walkingMinutes} min walk
+                  </p>
+                </div>
+              </div>
+              <div className="mt-3 flex items-center justify-end">
                 <div className="w-8 h-8 bg-white/10 group-hover:bg-primary flex items-center justify-center transition-all duration-300 rounded-sm">
                   <ArrowUpRight className="h-4 w-4 text-white group-hover:text-black transition-colors" />
                 </div>
