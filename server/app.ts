@@ -221,6 +221,11 @@ export async function bootstrapApp(options: BootstrapOptions = {}) {
 
   app.use(express.urlencoded({ extended: false }));
 
+  app.use("/api", (_req, res, next) => {
+    res.setHeader("Cache-Control", "no-store");
+    next();
+  });
+
   app.get("/api/metrics", (req, res) => {
     if (!isMetricsRequestAuthorized(req)) {
       return res.status(403).json({ error: "Forbidden" });
