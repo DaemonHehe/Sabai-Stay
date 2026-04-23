@@ -181,13 +181,19 @@ export async function registerRoutes(
 
   app.post("/api/bookings", async (req, res) => {
     try {
-      const actor = await requireAuth(req, res);
+      const actor = await requireRole(req, res, ["student"]);
       if (!actor) return;
 
       const validatedData = bookingRequestSchema.parse(req.body);
       const listing = await storage.getListingById(validatedData.listingId);
       if (!listing) {
         return res.status(404).json({ error: "Listing not found" });
+      }
+      if (!listing.ownerUserId) {
+        return res.status(409).json({
+          error:
+            "This listing is missing an owner account. Please contact support before requesting a booking.",
+        });
       }
 
       const booking = await storage.createBooking({

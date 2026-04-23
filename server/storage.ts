@@ -1342,6 +1342,47 @@ class SupabaseStorage implements IStorage {
     private readonly usingServiceRole: boolean,
   ) {}
 
+  private async ensureSeedListingOwners() {
+    const seedListingsByTitle = new Map(
+      seedListings.map((listing) => [listing.title, listing.ownerUserId]),
+    );
+    const seedTitles = Array.from(seedListingsByTitle.keys());
+    if (seedTitles.length === 0) {
+      return;
+    }
+
+    const { data, error } = await this.supabase
+      .from("listings")
+      .select("id, title, owner_user_id")
+      .in("title", seedTitles);
+    throwSupabaseError(error);
+
+    for (const row of data ?? []) {
+      if (row.owner_user_id) {
+        continue;
+      }
+
+      const ownerHandle = seedListingsByTitle.get(row.title);
+      if (!ownerHandle) {
+        continue;
+      }
+
+      try {
+        const ownerId = await this.getOrCreateSeedOwnerId(ownerHandle);
+        const { error: updateError } = await this.supabase
+          .from("listings")
+          .update({ owner_user_id: ownerId })
+          .eq("id", row.id);
+        throwSupabaseError(updateError);
+      } catch (error) {
+        console.warn(
+          `Seed owner repair failed for listing ${row.title}. Booking requests for this listing will remain unavailable.`,
+          error,
+        );
+      }
+    }
+  }
+
   async ensureSeedData() {
     const { count, error } = await this.supabase
       .from("listings")
@@ -1349,6 +1390,7 @@ class SupabaseStorage implements IStorage {
     throwSupabaseError(error);
 
     if ((count ?? 0) > 0) {
+      await this.ensureSeedListingOwners();
       return;
     }
 

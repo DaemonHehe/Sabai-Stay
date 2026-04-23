@@ -120,6 +120,7 @@ export default function ListingDetails() {
     mutationFn: api.createBooking,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["bookings"] });
       toast({
         title: "Booking request submitted",
         description:
@@ -134,6 +135,16 @@ export default function ListingDetails() {
         checkOut: "",
         guests: 1,
         requestNote: "",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Unable to submit booking",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Please check your booking details and try again.",
+        variant: "destructive",
       });
     },
   });
@@ -715,10 +726,11 @@ export default function ListingDetails() {
               !bookingData.guestEmail ||
               !bookingData.guestPhone ||
               !bookingData.checkIn ||
-              !bookingData.checkOut
+              !bookingData.checkOut ||
+              bookingMutation.isPending
             }
           >
-            Submit Request
+            {bookingMutation.isPending ? "Submitting..." : "Submit Request"}
           </Button>
         </div>
       </BookingModal>
