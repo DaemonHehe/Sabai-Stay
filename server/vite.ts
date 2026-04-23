@@ -1,7 +1,6 @@
 import { type Express } from "express";
 import { createServer as createViteServer, createLogger } from "vite";
 import { type Server } from "http";
-import viteConfig from "../vite.config.ts";
 import fs from "fs";
 import path from "path";
 import { randomUUID } from "node:crypto";
@@ -14,10 +13,10 @@ export async function setupVite(server: Server, app: Express) {
     hmr: { server, path: "/vite-hmr" },
     allowedHosts: true as const,
   };
+  const projectRoot = process.cwd();
 
   const vite = await createViteServer({
-    ...viteConfig,
-    configFile: false,
+    configFile: path.resolve(projectRoot, "vite.config.ts"),
     customLogger: {
       ...viteLogger,
       error: (msg, options) => {
@@ -36,8 +35,7 @@ export async function setupVite(server: Server, app: Express) {
 
     try {
       const clientTemplate = path.resolve(
-        import.meta.dirname,
-        "..",
+        projectRoot,
         "client",
         "index.html",
       );

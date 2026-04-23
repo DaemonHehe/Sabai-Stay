@@ -3,14 +3,16 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 
+const projectRoot = process.cwd();
+
 export default defineConfig({
   envPrefix: ["VITE_", "EXPO_PUBLIC_"],
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
-      "@": path.resolve(import.meta.dirname, "client", "src"),
-      "@shared": path.resolve(import.meta.dirname, "shared"),
-      "@assets": path.resolve(import.meta.dirname, "attached_assets"),
+      "@": path.resolve(projectRoot, "client", "src"),
+      "@shared": path.resolve(projectRoot, "shared"),
+      "@assets": path.resolve(projectRoot, "attached_assets"),
     },
   },
   css: {
@@ -18,9 +20,9 @@ export default defineConfig({
       plugins: [],
     },
   },
-  root: path.resolve(import.meta.dirname, "client"),
+  root: path.resolve(projectRoot, "client"),
   build: {
-    outDir: path.resolve(import.meta.dirname, "dist/public"),
+    outDir: path.resolve(projectRoot, "dist/public"),
     emptyOutDir: true,
     rollupOptions: {
       output: {
