@@ -73,15 +73,15 @@ export function Layout({
             <div className="cursor-pointer group flex items-center gap-3">
               <div className="w-10 h-10 bg-primary flex items-center justify-center">
                 <span className="font-display font-black text-primary-foreground text-lg">
-                  R
+                  S
                 </span>
               </div>
               <div className="hidden sm:block">
                 <span className="font-display font-bold text-xl tracking-tighter group-hover:text-primary transition-colors">
-                  ROAM
+                  SABAI STAY
                 </span>
                 <span className="text-[9px] font-mono block tracking-[0.3em] opacity-40 -mt-0.5">
-                  RANGSIT
+                  STUDENT HOUSING
                 </span>
               </div>
             </div>
@@ -298,10 +298,10 @@ export function Layout({
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 bg-primary flex items-center justify-center">
                     <span className="font-display font-black text-primary-foreground text-sm">
-                      R
+                      S
                     </span>
                   </div>
-                  <span className="font-display font-bold text-lg">ROAM</span>
+                  <span className="font-display font-bold text-lg">SABAI STAY</span>
                 </div>
                 <p className="opacity-40 text-sm max-w-xs leading-relaxed">
                   Student housing platform for Rangsit University and Bangkok
@@ -361,7 +361,7 @@ export function Layout({
               className="mt-12 pt-6 border-t flex flex-col sm:flex-row justify-between items-center gap-4 text-xs opacity-30 font-mono"
               style={{ borderColor: "var(--color-border)" }}
             >
-              <p>Copyright 2026 ROAM RANGSIT</p>
+              <p>Copyright 2026 SABAI STAY</p>
               <p className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
                 PATHUM THANI, THAILAND

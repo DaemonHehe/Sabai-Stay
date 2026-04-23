@@ -1,5 +1,5 @@
 {
-  "name": "rest-express",
+  "name": "sabai-stay",
   "version": "1.0.0",
   "type": "module",
   "license": "MIT",
@@ -9,6 +9,7 @@
     "build": "tsx script/build.ts",
     "start": "cross-env NODE_ENV=production node dist/index.cjs",
     "check": "tsc",
+    "test": "tsx --test test/**/*.test.ts",
     "db:push": "node -e \"console.error('This project no longer uses Drizzle. Manage schema in Supabase instead.'); process.exit(1)\""
   },
   "dependencies": {
@@ -47,11 +48,14 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
+    "cors": "^2.8.5",
     "date-fns": "^3.6.0",
     "embla-carousel-react": "^8.6.0",
     "express": "^5.0.1",
+    "express-rate-limit": "^7.5.1",
     "express-session": "^1.18.1",
     "framer-motion": "^12.23.24",
+    "helmet": "^8.1.0",
     "input-otp": "^1.4.2",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.545.0",
@@ -79,6 +83,7 @@
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.14",
     "@types/express": "^5.0.0",
+    "@types/cors": "^2.8.17",
     "@types/express-session": "^1.18.0",
     "@types/node": "^20.19.0",
     "@types/passport": "^1.0.16",

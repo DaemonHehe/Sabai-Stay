@@ -2,7 +2,7 @@
 
 ## 1. Purpose
 
-SabaiStay is a university housing platform focused on student rental discovery
+Sabai Stay is a university housing platform focused on student rental discovery
 and workflows around booking, contracts, roommate matching, and university-aware
 navigation. The codebase is implemented as a single deployable application:
 
@@ -86,9 +86,9 @@ server/
   seed-data.ts
 shared/
   schema.ts
-script/A
+script/
   build.ts
-schema.sqlcan
+schema.sql
 SUPABASE_SETUP.md
 ```
 
@@ -160,7 +160,7 @@ storage. The client parses most API responses with the same schemas.
 - `/`: home page with a map-first housing discovery experience
 - `/list`: filterable listing search page
 - `/listing/:id`: listing details, utilities, reviews, and booking request flow
-- `/dashboard`: owner, student, and admin workflow page
+- `/dashboard`: owner and student workflow page
 
 ### 6.3 Data Layer
 
@@ -217,13 +217,11 @@ Routes and some large components are also lazy-loaded.
 
 - `requireAuth()`
 - `requireRole()`
-- `requireAdmin()`
 
 Role model:
 
 - `student`
 - `owner`
-- `admin`
 
 Authentication is based on the Supabase access token sent by the browser.
 `getAuthActor()` resolves the current auth user, then loads the matching
@@ -266,7 +264,7 @@ conflict signaling.
 - `GET /api/notifications`
 - `PATCH /api/notifications/:id/read`
 
-#### Owner or Admin Endpoints
+#### Owner Endpoints
 
 - `POST /api/listings`
 - `PATCH /api/listings/:id`
@@ -274,26 +272,11 @@ conflict signaling.
 - `PATCH /api/contracts/:id/status`
 - `PATCH /api/reviews/:id/response`
 
-#### Student or Admin Endpoints
+#### Student Endpoints
 
 - `POST /api/reviews`
 - `POST /api/roommates/profiles`
 - `POST /api/roommates/messages`
-
-#### Admin Endpoints
-
-- `GET /api/admin/verifications`
-- `PATCH /api/admin/verifications/:id`
-- `GET /api/admin/disputes`
-- `PATCH /api/admin/disputes/:id`
-
-Admin access can come from:
-
-- an authenticated `admin` role
-- `x-admin-key` matching `ADMIN_API_KEY`
-
-The header-based admin key is mainly useful for operational access paths and
-non-production workflows.
 
 ## 8. Core Domain Workflows
 
@@ -321,7 +304,7 @@ Current flow:
 
 1. Student submits a booking request.
 2. Server calculates the stay total from the monthly price and date range.
-3. Owner or admin updates the booking state.
+3. Owner updates the booking state.
 4. Booking timeline events are stored.
 5. Related notifications and contracts are updated as the workflow advances.
 
@@ -354,7 +337,7 @@ metadata records in `contract_documents`.
 - Match rows are persisted in `roommate_matches`.
 - Messages are persisted in `roommate_messages`.
 
-### 8.6 Notifications and Admin Queues
+### 8.6 Notifications and Operational Queues
 
 - Notifications are stored in `notifications`.
 - Verification requests are stored in `verification_tasks`.
@@ -410,7 +393,8 @@ metadata records in `contract_documents`.
 ### 9.3 Important Functions and Triggers
 
 - `public.set_updated_at()`: updates `updated_at` columns
-- `public.is_admin()`: resolves whether the current auth user is an admin
+- `public.is_admin()`: legacy helper retained for compatibility in existing SQL
+  policies
 - `public.sync_auth_user_profile()`: syncs Supabase Auth users into app tables
 
 Trigger coverage includes:
@@ -454,8 +438,6 @@ High-level policy model:
 - Owners:
   - can manage only their own listings
   - can respond to reviews for their own listings
-- Admins:
-  - have broad access through `public.is_admin()`
 
 Important operational note:
 
@@ -470,7 +452,6 @@ Important operational note:
 Environment variables from `.env.example`:
 
 - `PORT`: Express port, defaults to `5000`
-- `ADMIN_API_KEY`: optional admin header fallback for admin endpoints
 - `SUPABASE_URL`: server-side Supabase project URL
 - `SUPABASE_SERVICE_ROLE_KEY`: required for persistent server writes
 - `VITE_SUPABASE_URL`: browser-side Supabase URL
@@ -556,7 +537,7 @@ with shared Zod schemas. This is the main place to update when:
 The implementation is functional, but there are still architectural and product
 boundaries worth noting:
 
-- There is no automated unit or integration test suite yet.
+- Baseline automated tests and CI are included (`npm test` and GitHub Actions).
 - Payment processing is not integrated.
 - Contract documents are metadata rows, not a full signed file workflow.
 - Notifications are in-app records only; email/push delivery is not wired in.
@@ -576,4 +557,5 @@ engineering steps are:
 4. Add object storage support for real listing photo and contract document
    uploads.
 5. Integrate payment and notification providers if the booking workflow needs to
-   be operational beyond demo/admin-managed states.
+   be operational beyond demo-managed states.
+

@@ -45,10 +45,6 @@ function prettifyRole(role: string | undefined) {
     return "Student";
   }
 
-  if (role === "admin") {
-    return "Admin";
-  }
-
   return "Account";
 }
 

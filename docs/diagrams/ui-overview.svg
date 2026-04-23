@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1320" viewBox="0 0 1800 1320" role="img" aria-labelledby="title desc">
-  <title id="title">SabaiStay UI Overview</title>
-  <desc id="desc">UI overview board using actual SabaiStay route screenshots for the home page, list page, listing details page, and dashboard page.</desc>
+  <title id="title">Sabai Stay UI Overview</title>
+  <desc id="desc">UI overview board using actual Sabai Stay route screenshots for the home page, list page, listing details page, and dashboard page.</desc>
   <defs>
     <style>
       .bg { fill: #f8fafc; }
@@ -29,7 +29,7 @@
   </defs>
 
   <rect class="bg" x="0" y="0" width="1800" height="1320" />
-  <text class="title" x="40" y="56">SabaiStay UI Overview</text>
+  <text class="title" x="40" y="56">Sabai Stay UI Overview</text>
   <text class="subtitle" x="40" y="86">This board uses real route captures from the running application instead of illustrative placeholders.</text>
 
   <g>
@@ -82,3 +82,4 @@
 
   <rect class="callout" x="40" y="20" width="700" height="70" opacity="0" />
 </svg>
+

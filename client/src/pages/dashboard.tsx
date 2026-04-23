@@ -8,92 +8,27 @@ import { api } from "@/lib/api";
 import { queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/contexts/auth-context";
 import { useToast } from "@/hooks/use-toast";
+import { Card, SectionTitle } from "@/features/dashboard/dashboard-ui";
+import {
+  bookingStatusTransitionMap,
+  contractStatusTransitionMap,
+  formatCurrency,
+  formatDate,
+  listingStatusValues,
+  toLabel,
+} from "@/features/dashboard/dashboard-format";
 import type {
   BookingStatus,
   ContractStatus,
-  DisputeCase,
   Listing,
   RoommateProfile,
-  VerificationStatus,
 } from "@shared/schema";
-
-function SectionTitle({
-  kicker,
-  title,
-  description,
-}: {
-  kicker: string;
-  title: string;
-  description: string;
-}) {
-  return (
-    <div className="mb-5">
-      <p className="text-[10px] font-mono uppercase tracking-[0.3em] text-primary">
-        {kicker}
-      </p>
-      <h2 className="mt-2 font-display text-2xl font-bold uppercase">{title}</h2>
-      <p className="mt-2 max-w-2xl text-sm opacity-60">{description}</p>
-    </div>
-  );
-}
-
-function Card({ children }: { children: React.ReactNode }) {
-  return (
-    <div
-      className="rounded-sm border p-5"
-      style={{
-        backgroundColor: "var(--color-card)",
-        borderColor: "var(--color-border)",
-      }}
-    >
-      {children}
-    </div>
-  );
-}
 
 type OwnerBookingFilter = "triage" | "all" | BookingStatus;
 type OwnerBookingSort = "newest" | "check_in" | "highest_value";
 type OwnerListingFilter = "all" | Listing["listingStatus"];
 type OwnerListingSort = "recent" | "price_high" | "price_low";
 
-const listingStatusValues: Listing["listingStatus"][] = [
-  "draft",
-  "active",
-  "archived",
-];
-
-const bookingStatusTransitionMap: Record<BookingStatus, BookingStatus[]> = {
-  requested: ["approved", "rejected"],
-  approved: ["deposit_pending", "rejected"],
-  deposit_pending: ["confirmed", "rejected"],
-  confirmed: ["cancelled"],
-  rejected: [],
-  cancelled: [],
-};
-
-const contractStatusTransitionMap: Record<ContractStatus, ContractStatus[]> = {
-  draft: ["pending_signature", "cancelled"],
-  pending_signature: ["active", "cancelled"],
-  active: ["completed", "cancelled"],
-  completed: [],
-  cancelled: [],
-};
-
-function toLabel(value: string) {
-  return value.replaceAll("_", " ");
-}
-
-function formatDate(value: Date) {
-  return new Intl.DateTimeFormat("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  }).format(value);
-}
-
-function formatCurrency(value: number) {
-  return `THB ${value.toLocaleString()}`;
-}
 
 export default function Dashboard() {
   const { toast } = useToast();
@@ -138,6 +73,10 @@ export default function Dashboard() {
     roomType: "studio" as Listing["roomType"],
     walkingMinutes: 10,
   });
+  const [listingImageFile, setListingImageFile] = useState<File | null>(null);
+  const [contractUploadFiles, setContractUploadFiles] = useState<
+    Record<string, File | null>
+  >({});
 
   const [roommateForm, setRoommateForm] = useState<
     Omit<RoommateProfile, "id" | "createdAt" | "updatedAt">
@@ -167,10 +106,10 @@ export default function Dashboard() {
   );
 
   const viewerRole = profile?.appUser.role ?? null;
-  const canManageListings = viewerRole === "owner" || viewerRole === "admin";
-  const canManageContracts = viewerRole === "owner" || viewerRole === "admin";
-  const canUseRoommates = viewerRole === "student" || viewerRole === "admin";
-  const canUseAdminTools = viewerRole === "admin";
+  const canManageListings = viewerRole === "owner";
+  const canManageContracts = viewerRole === "owner";
+  const canUseRoommates = viewerRole === "student";
+  const canUploadContractDocuments = Boolean(viewerRole);
 
   const activeUniversityId =
     profile?.studentProfile?.universityId ??
@@ -237,8 +176,25 @@ export default function Dashboard() {
   }, [dashboard?.roommateMatches, selectedMatchId]);
 
   const createListingMutation = useMutation({
-    mutationFn: () =>
-      api.createListing({
+    mutationFn: async () => {
+      let imageUrl = "/images/condo-exterior.png";
+      let gallery = ["/images/condo-exterior.png"];
+
+      if (listingImageFile) {
+        const upload = await api.createListingImageUploadUrl({
+          fileName: listingImageFile.name,
+          contentType: listingImageFile.type,
+          fileSize: listingImageFile.size,
+        });
+        await api.uploadFileToSignedUrl({
+          signedUploadUrl: upload.signedUploadUrl,
+          file: listingImageFile,
+        });
+        imageUrl = upload.assetUrl;
+        gallery = [upload.assetUrl];
+      }
+
+      return api.createListing({
         ownerUserId: profile?.appUser.id ?? "",
         universityId: activeUniversityId,
         title: listingForm.title,
@@ -247,8 +203,8 @@ export default function Dashboard() {
         rating: "0.00",
         category: listingForm.category,
         roomType: listingForm.roomType,
-        image: "/images/condo-exterior.png",
-        gallery: ["/images/condo-exterior.png"],
+        image: imageUrl,
+        gallery,
         description:
           "New owner-submitted listing with utilities, contract workflow, and campus-aware commute data.",
         latitude: "13.9650",
@@ -277,7 +233,8 @@ export default function Dashboard() {
         ],
         availableFrom: new Date(),
         availableTo: null,
-      }),
+      });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       queryClient.invalidateQueries({ queryKey: ["listings"] });
@@ -292,6 +249,60 @@ export default function Dashboard() {
         category: "CONDO",
         roomType: "studio",
         walkingMinutes: 10,
+      });
+      setListingImageFile(null);
+    },
+    onError: (error) => {
+      toast({
+        title: "Unable to create listing",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Listing draft creation failed.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const uploadContractDocumentMutation = useMutation({
+    mutationFn: async ({
+      contractId,
+      file,
+    }: {
+      contractId: string;
+      file: File;
+    }) => {
+      const upload = await api.createContractDocumentUploadUrl({
+        contractId,
+        fileName: file.name,
+        contentType: file.type,
+        fileSize: file.size,
+      });
+      await api.uploadFileToSignedUrl({
+        signedUploadUrl: upload.signedUploadUrl,
+        file,
+      });
+      return api.registerContractDocument(contractId, {
+        name: file.name,
+        type: file.type,
+        path: upload.path,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      toast({
+        title: "Document uploaded",
+        description: "Contract document was uploaded and linked successfully.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Upload failed",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Unable to upload and register contract document.",
+        variant: "destructive",
       });
     },
   });
@@ -362,40 +373,6 @@ export default function Dashboard() {
       toast({
         title: "Message sent",
         description: "Student-to-student roommate messaging is active.",
-      });
-    },
-  });
-
-  const verificationMutation = useMutation({
-    mutationFn: ({
-      id,
-      status,
-    }: {
-      id: string;
-      status: VerificationStatus;
-    }) => api.updateVerificationTask(id, status),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
-      toast({
-        title: "Verification updated",
-        description: "Admin verification queue action completed.",
-      });
-    },
-  });
-
-  const disputeMutation = useMutation({
-    mutationFn: ({
-      id,
-      status,
-    }: {
-      id: string;
-      status: DisputeCase["status"];
-    }) => api.updateDisputeStatus(id, status),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
-      toast({
-        title: "Dispute updated",
-        description: "Admin dispute workflow status changed.",
       });
     },
   });
@@ -549,6 +526,13 @@ export default function Dashboard() {
   ]);
 
   if (dashboardError) {
+    const message =
+      dashboardError instanceof Error
+        ? dashboardError.message
+        : "Sign in with a valid account and make sure the Supabase schema is applied before using owner and student workflows.";
+    const isAuthError = message.toLowerCase().includes("authentication");
+    const isForbiddenError = message.toLowerCase().includes("forbidden");
+
     return (
       <Layout>
         <div className="container mx-auto px-4 md:px-6 py-16">
@@ -557,8 +541,11 @@ export default function Dashboard() {
               Dashboard Unavailable
             </p>
             <p className="mt-3 text-sm opacity-70">
-              Sign in with a valid account and make sure the Supabase schema is
-              applied before using owner, student, or admin workflows.
+              {isAuthError
+                ? "Your session is not active. Sign in as a Student or Owner to access dashboard workflows."
+                : isForbiddenError
+                  ? "Your account does not have permission for this dashboard action."
+                  : message}
             </p>
           </Card>
         </div>
@@ -587,11 +574,15 @@ export default function Dashboard() {
   if (isLoading || !dashboard || !discovery) {
     return (
       <Layout>
-        <div className="min-h-[60vh] flex items-center justify-center">
-          <div className="flex items-center gap-3">
-            <div className="w-2 h-2 bg-primary rounded-full animate-bounce [animation-delay:-0.3s]" />
-            <div className="w-2 h-2 bg-primary rounded-full animate-bounce [animation-delay:-0.15s]" />
-            <div className="w-2 h-2 bg-primary rounded-full animate-bounce" />
+        <div className="container mx-auto px-4 md:px-6 py-16">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {Array.from({ length: 8 }).map((_, index) => (
+              <Card key={index}>
+                <div className="h-3 w-24 animate-pulse rounded bg-secondary/80" />
+                <div className="mt-4 h-10 w-20 animate-pulse rounded bg-secondary/80" />
+                <div className="mt-2 h-3 w-32 animate-pulse rounded bg-secondary/80" />
+              </Card>
+            ))}
           </div>
         </div>
       </Layout>
@@ -652,6 +643,18 @@ export default function Dashboard() {
               </p>
             </Card>
           </div>
+        ) : null}
+
+        {!canManageListings ? (
+          <Card>
+            <p className="font-display text-lg font-bold uppercase">
+              Owner Workspace Locked
+            </p>
+            <p className="mt-2 text-sm opacity-70">
+              Listing creation, booking triage, and moderation controls are available
+              for Owner accounts only.
+            </p>
+          </Card>
         ) : null}
 
         {canManageListings ? (
@@ -753,6 +756,20 @@ export default function Dashboard() {
                         <option value="shared">shared</option>
                       </select>
                     </div>
+                    <div className="space-y-2">
+                      <Input
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        onChange={(event) =>
+                          setListingImageFile(event.target.files?.[0] ?? null)
+                        }
+                      />
+                      <p className="text-xs opacity-60">
+                        {listingImageFile
+                          ? `Selected image: ${listingImageFile.name}`
+                          : "Optional: upload a listing cover image (PNG/JPG/WEBP)."}
+                      </p>
+                    </div>
                     <Button
                       className="w-full"
                       onClick={() => createListingMutation.mutate()}
@@ -764,7 +781,9 @@ export default function Dashboard() {
                         createListingMutation.isPending
                       }
                     >
-                      Submit Draft
+                      {createListingMutation.isPending
+                        ? "Submitting..."
+                        : "Submit Draft"}
                     </Button>
                   </div>
                 </Card>
@@ -1158,10 +1177,57 @@ export default function Dashboard() {
                       ) : null}
                     </div>
                     <div className="mt-3 space-y-2 text-sm opacity-70">
-                      {contract.documents.map((document) => (
-                        <p key={document.id}>{document.name}</p>
-                      ))}
+                      {contract.documents.length ? (
+                        contract.documents.map((document) => (
+                          <p key={document.id}>{document.name}</p>
+                        ))
+                      ) : (
+                        <p className="text-xs opacity-60">
+                          No documents uploaded yet.
+                        </p>
+                      )}
                     </div>
+                    {canUploadContractDocuments ? (
+                      <div className="mt-4 rounded-sm border p-3" style={{ borderColor: "var(--color-border)" }}>
+                        <Input
+                          type="file"
+                          accept="application/pdf,image/png,image/jpeg"
+                          onChange={(event) =>
+                            setContractUploadFiles((current) => ({
+                              ...current,
+                              [contract.id]: event.target.files?.[0] ?? null,
+                            }))
+                          }
+                        />
+                        <div className="mt-2 flex items-center justify-between gap-3">
+                          <p className="text-xs opacity-60">
+                            {contractUploadFiles[contract.id]
+                              ? contractUploadFiles[contract.id]?.name
+                              : "Upload PDF/JPG/PNG contract documents via signed URL."}
+                          </p>
+                          <Button
+                            type="button"
+                            size="sm"
+                            disabled={
+                              !contractUploadFiles[contract.id] ||
+                              uploadContractDocumentMutation.isPending
+                            }
+                            onClick={() => {
+                              const file = contractUploadFiles[contract.id];
+                              if (!file) return;
+                              uploadContractDocumentMutation.mutate({
+                                contractId: contract.id,
+                                file,
+                              });
+                            }}
+                          >
+                            {uploadContractDocumentMutation.isPending
+                              ? "Uploading..."
+                              : "Upload"}
+                          </Button>
+                        </div>
+                      </div>
+                    ) : null}
                   </Card>
                 );
               })}
@@ -1302,103 +1368,23 @@ export default function Dashboard() {
           </section>
         ) : null}
 
-        {canUseAdminTools ? (
-          <section>
-            <SectionTitle
-              kicker="Admin"
-              title="Verification, Moderation, And Disputes"
-              description="Admin tools now surface user verification, listing moderation queues, and active dispute handling."
-            />
-            <div className="grid gap-6 lg:grid-cols-2">
-              <Card>
-                <p className="font-display font-bold uppercase">Verification Queue</p>
-                <div className="mt-4 space-y-3">
-                  {dashboard.verificationTasks.map((task) => (
-                    <div
-                      key={task.id}
-                      className="rounded-sm border p-3"
-                      style={{ borderColor: "var(--color-border)" }}
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <p className="font-semibold">{task.name}</p>
-                          <p className="text-sm opacity-60">
-                            {task.role} | {task.status}
-                          </p>
-                        </div>
-                        <div className="flex gap-2">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              verificationMutation.mutate({
-                                id: task.id,
-                                status: "verified",
-                              })
-                            }
-                            className="rounded-full border px-3 py-1 text-[10px] font-mono uppercase"
-                            style={{ borderColor: "var(--color-border)" }}
-                          >
-                            Verify
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              verificationMutation.mutate({
-                                id: task.id,
-                                status: "rejected",
-                              })
-                            }
-                            className="rounded-full border px-3 py-1 text-[10px] font-mono uppercase"
-                            style={{ borderColor: "var(--color-border)" }}
-                          >
-                            Reject
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </Card>
-
-              <Card>
-                <p className="font-display font-bold uppercase">Dispute Escalations</p>
-                <div className="mt-4 space-y-3">
-                  {dashboard.disputes.map((dispute) => (
-                    <div
-                      key={dispute.id}
-                      className="rounded-sm border p-3"
-                      style={{ borderColor: "var(--color-border)" }}
-                    >
-                      <p className="font-semibold">{dispute.title}</p>
-                      <p className="mt-2 text-sm opacity-70">{dispute.description}</p>
-                      <div className="mt-3 flex gap-2">
-                        {(["open", "investigating", "resolved"] as const).map((status) => (
-                          <button
-                            key={status}
-                            type="button"
-                            onClick={() =>
-                              disputeMutation.mutate({ id: dispute.id, status })
-                            }
-                            className="rounded-full border px-3 py-1 text-[10px] font-mono uppercase"
-                            style={{ borderColor: "var(--color-border)" }}
-                          >
-                            {status}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </Card>
-            </div>
-          </section>
+        {!canUseRoommates ? (
+          <Card>
+            <p className="font-display text-lg font-bold uppercase">
+              Roommate Matching Is Student-Only
+            </p>
+            <p className="mt-2 text-sm opacity-70">
+              Switch to a Student account to edit roommate preferences and message
+              matches.
+            </p>
+          </Card>
         ) : null}
 
         <section>
           <SectionTitle
             kicker="Notifications"
             title="Alerts And Workflow Updates"
-            description="Booking changes, contract milestones, verification actions, and roommate activity now generate notification records."
+            description="Booking changes, contract milestones, and roommate activity now generate notification records."
           />
           <div className="grid gap-4">
             {dashboard.notifications.map((notification) => (

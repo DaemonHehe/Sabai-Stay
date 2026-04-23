@@ -1,6 +1,6 @@
 import { Layout } from "@/components/layout";
 import { ListingCard, ListingCardSkeleton } from "@/components/listing-card";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { SlidersHorizontal } from "lucide-react";
 import { useSearchParams } from "wouter";
@@ -19,6 +19,7 @@ const categoryFilters = [
 ];
 
 export default function ListView() {
+  const PAGE_SIZE = 24;
   const [searchParams] = useSearchParams();
   const searchQuery = searchParams.get("q") ?? "";
   const { data: discovery } = useQuery({
@@ -31,6 +32,7 @@ export default function ListView() {
   const [maxWalkingMinutes, setMaxWalkingMinutes] = useState(30);
   const [minCapacity, setMinCapacity] = useState(1);
   const [maxPrice, setMaxPrice] = useState(25000);
+  const [page, setPage] = useState(1);
 
   const filters = useMemo(
     () => ({
@@ -54,10 +56,18 @@ export default function ListView() {
     ],
   );
 
-  const { data: listings = [], isLoading } = useQuery({
-    queryKey: ["listings", filters],
-    queryFn: () => api.getListings(filters),
+  useEffect(() => {
+    setPage(1);
+  }, [filters]);
+
+  const { data: listingsPage, isLoading, isFetching } = useQuery({
+    queryKey: ["listings", "paged", filters, page],
+    queryFn: () => api.getListingsPage({ filters, page, pageSize: PAGE_SIZE }),
   });
+
+  const listings = listingsPage?.items ?? [];
+  const totalListings = listingsPage?.total ?? 0;
+  const totalPages = listingsPage?.totalPages ?? 1;
 
   return (
     <Layout>
@@ -208,10 +218,18 @@ export default function ListView() {
         <div className="flex items-center justify-between mb-6">
           <div className="flex flex-col gap-1">
             <p className="text-sm opacity-40 font-mono">
-              {isLoading ? "Loading..." : `${listings.length} properties found`}
+              {isLoading
+                ? "Loading..."
+                : `${totalListings.toLocaleString()} properties found`}
             </p>
             {searchQuery ? (
               <p className="text-xs font-mono opacity-50">Search: "{searchQuery}"</p>
+            ) : null}
+            {!isLoading ? (
+              <p className="text-xs font-mono opacity-50">
+                Page {page} of {Math.max(totalPages, 1)}
+                {isFetching ? " • refreshing" : ""}
+              </p>
             ) : null}
           </div>
         </div>
@@ -239,6 +257,34 @@ export default function ListView() {
             <p className="opacity-50">
               Relax the campus or budget filters to broaden the discovery set.
             </p>
+          </div>
+        ) : null}
+
+        {!isLoading && listings.length > 0 ? (
+          <div className="mt-8 flex items-center justify-center gap-3">
+            <button
+              type="button"
+              className="rounded-sm border px-4 py-2 text-xs font-mono uppercase tracking-wider disabled:opacity-40"
+              style={{ borderColor: "var(--color-border)" }}
+              onClick={() => setPage((current) => Math.max(1, current - 1))}
+              disabled={page <= 1}
+            >
+              Previous
+            </button>
+            <span className="text-xs font-mono opacity-60">
+              Page {page} / {Math.max(totalPages, 1)}
+            </span>
+            <button
+              type="button"
+              className="rounded-sm border px-4 py-2 text-xs font-mono uppercase tracking-wider disabled:opacity-40"
+              style={{ borderColor: "var(--color-border)" }}
+              onClick={() =>
+                setPage((current) => Math.min(Math.max(totalPages, 1), current + 1))
+              }
+              disabled={page >= totalPages}
+            >
+              Next
+            </button>
           </div>
         ) : null}
       </div>

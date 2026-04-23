@@ -23,7 +23,7 @@ server-side SQL.
 
 ## Expected Tables
 
-This schema now includes the role and workflow model from the SabaiStay paper:
+This schema now includes the role and workflow model from the Sabai Stay paper:
 
 - `app_users`
 - `universities`
@@ -124,3 +124,4 @@ application at runtime.
   no longer supports an anon-key write mode.
 - You can override that behavior with `ALLOW_MEMORY_FALLBACK=true`, but that is
   not recommended for a real deployment.
+

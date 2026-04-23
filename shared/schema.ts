@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const userRoleSchema = z.enum(["student", "owner", "admin"]);
+export const userRoleSchema = z.enum(["student", "owner"]);
 export const verificationStatusSchema = z.enum([
   "pending",
   "verified",
@@ -170,6 +170,7 @@ export const contractDocumentSchema = z.object({
   id: z.string(),
   name: z.string().min(1),
   type: z.string().min(1),
+  fileUrl: z.string().optional().nullable(),
   uploadedAt: z.coerce.date(),
 });
 
@@ -218,6 +219,23 @@ export const roommateProfileSchema = z.object({
   isActive: z.boolean().default(true),
   createdAt: z.coerce.date(),
   updatedAt: z.coerce.date(),
+});
+
+export const publicRoommateProfileSchema = roommateProfileSchema.pick({
+  id: true,
+  universityId: true,
+  displayName: true,
+  studyHabit: true,
+  sleepSchedule: true,
+  cleanliness: true,
+  genderPreference: true,
+  budgetMin: true,
+  budgetMax: true,
+  preferredMoveIn: true,
+  preferredLeaseMonths: true,
+  openToVisitors: true,
+  isActive: true,
+  updatedAt: true,
 });
 
 export const roommateMatchSchema = z.object({
@@ -377,6 +395,30 @@ export const dashboardDataSchema = z.object({
   notifications: z.array(notificationSchema),
 });
 
+export const paginatedListingsSchema = z.object({
+  items: z.array(listingSchema),
+  page: z.number().int().positive(),
+  pageSize: z.number().int().positive(),
+  total: z.number().int().nonnegative(),
+  totalPages: z.number().int().nonnegative(),
+});
+
+export const paginatedBookingsSchema = z.object({
+  items: z.array(bookingSchema),
+  page: z.number().int().positive(),
+  pageSize: z.number().int().positive(),
+  total: z.number().int().nonnegative(),
+  totalPages: z.number().int().nonnegative(),
+});
+
+export const paginatedContractsSchema = z.object({
+  items: z.array(contractSchema),
+  page: z.number().int().positive(),
+  pageSize: z.number().int().positive(),
+  total: z.number().int().nonnegative(),
+  totalPages: z.number().int().nonnegative(),
+});
+
 export type UserRole = z.infer<typeof userRoleSchema>;
 export type VerificationStatus = z.infer<typeof verificationStatusSchema>;
 export type RoomType = z.infer<typeof roomTypeSchema>;
@@ -397,6 +439,7 @@ export type Contract = z.infer<typeof contractSchema>;
 export type Review = z.infer<typeof reviewSchema>;
 export type InsertReview = z.infer<typeof insertReviewSchema>;
 export type RoommateProfile = z.infer<typeof roommateProfileSchema>;
+export type PublicRoommateProfile = z.infer<typeof publicRoommateProfileSchema>;
 export type InsertRoommateProfile = z.infer<typeof insertRoommateProfileSchema>;
 export type RoommateMatch = z.infer<typeof roommateMatchSchema>;
 export type RoommateMessage = z.infer<typeof roommateMessageSchema>;
@@ -412,3 +455,6 @@ export type OwnerProfile = z.infer<typeof ownerProfileSchema>;
 export type AuthProfile = z.infer<typeof authProfileSchema>;
 export type DiscoveryData = z.infer<typeof discoveryDataSchema>;
 export type DashboardData = z.infer<typeof dashboardDataSchema>;
+export type PaginatedListings = z.infer<typeof paginatedListingsSchema>;
+export type PaginatedBookings = z.infer<typeof paginatedBookingsSchema>;
+export type PaginatedContracts = z.infer<typeof paginatedContractsSchema>;

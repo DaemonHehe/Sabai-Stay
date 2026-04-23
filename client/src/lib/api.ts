@@ -6,36 +6,45 @@ import {
   ContractStatus,
   DashboardData,
   DiscoveryData,
-  DisputeCase,
   InsertListing,
   InsertReview,
   Listing,
   ListingFilters,
   Notification,
+  PaginatedBookings,
+  PaginatedContracts,
+  PaginatedListings,
+  PublicRoommateProfile,
   Review,
   RoommateMatch,
   RoommateMessage,
   RoommateProfile,
   UtilityEstimate,
-  VerificationStatus,
-  VerificationTask,
   bookingSchema,
   contractSchema,
   dashboardDataSchema,
   discoveryDataSchema,
-  disputeCaseSchema,
   listingSchema,
   notificationSchema,
+  paginatedBookingsSchema,
+  paginatedContractsSchema,
+  paginatedListingsSchema,
+  publicRoommateProfileSchema,
   reviewSchema,
   roommateMatchSchema,
   roommateMessageSchema,
   roommateProfileSchema,
   utilityEstimateSchema,
-  verificationTaskSchema,
 } from "@shared/schema";
 import { getSupabaseAccessToken } from "@/lib/supabase";
 
 const API_BASE = "/api";
+
+function dispatchSessionExpiredEvent() {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("sabai:session-expired"));
+  }
+}
 
 async function parseResponse<T>(response: Response, fallbackMessage: string): Promise<T> {
   if (!response.ok) {
@@ -44,6 +53,15 @@ async function parseResponse<T>(response: Response, fallbackMessage: string): Pr
       .catch(() => ({ error: fallbackMessage }));
     const errorMessage =
       typeof errorData.error === "string" ? errorData.error : fallbackMessage;
+
+    if (response.status === 401) {
+      dispatchSessionExpiredEvent();
+    }
+
+    if (response.status === 403 && errorMessage === fallbackMessage) {
+      throw new Error("You do not have permission to perform this action.");
+    }
+
     throw new Error(errorMessage);
   }
 
@@ -109,6 +127,32 @@ export const api = {
       })}`,
     );
     return z.array(listingSchema).parse(
+      await parseResponse(response, "Failed to fetch listings"),
+    );
+  },
+
+  async getListingsPage(input: {
+    filters?: ListingFilters;
+    page?: number;
+    pageSize?: number;
+  }): Promise<PaginatedListings> {
+    const filters = input.filters ?? {};
+    const response = await fetch(
+      `${API_BASE}/listings${buildQuery({
+        q: filters.q,
+        category: filters.category,
+        universityId: filters.universityId,
+        campusZoneId: filters.campusZoneId,
+        roomType: filters.roomType,
+        minPrice: filters.minPrice,
+        maxPrice: filters.maxPrice,
+        minCapacity: filters.minCapacity,
+        maxWalkingMinutes: filters.maxWalkingMinutes,
+        page: input.page ?? 1,
+        pageSize: input.pageSize ?? 24,
+      })}`,
+    );
+    return paginatedListingsSchema.parse(
       await parseResponse(response, "Failed to fetch listings"),
     );
   },
@@ -187,6 +231,18 @@ export const api = {
     );
   },
 
+  async getBookingsPage(page = 1, pageSize = 20): Promise<PaginatedBookings> {
+    const response = await fetch(
+      `${API_BASE}/bookings${buildQuery({ page, pageSize })}`,
+      {
+        headers: await createHeaders(),
+      },
+    );
+    return paginatedBookingsSchema.parse(
+      await parseResponse(response, "Failed to fetch bookings"),
+    );
+  },
+
   async updateBookingStatus(id: string, status: BookingStatus): Promise<Booking> {
     const response = await fetch(`${API_BASE}/bookings/${id}/status`, {
       method: "PATCH",
@@ -203,6 +259,21 @@ export const api = {
       headers: await createHeaders(),
     });
     return z.array(contractSchema).parse(
+      await parseResponse(response, "Failed to fetch contracts"),
+    );
+  },
+
+  async getContractsPage(
+    page = 1,
+    pageSize = 20,
+  ): Promise<PaginatedContracts> {
+    const response = await fetch(
+      `${API_BASE}/contracts${buildQuery({ page, pageSize })}`,
+      {
+        headers: await createHeaders(),
+      },
+    );
+    return paginatedContractsSchema.parse(
       await parseResponse(response, "Failed to fetch contracts"),
     );
   },
@@ -252,13 +323,24 @@ export const api = {
     );
   },
 
-  async getRoommateProfiles(): Promise<RoommateProfile[]> {
+  async getRoommateProfiles(): Promise<PublicRoommateProfile[]> {
     const response = await fetch(`${API_BASE}/roommates/profiles`, {
       headers: await createHeaders(),
     });
-    return z.array(roommateProfileSchema).parse(
+    return z.array(publicRoommateProfileSchema).parse(
       await parseResponse(response, "Failed to fetch roommate profiles"),
     );
+  },
+
+  async getMyRoommateProfile(): Promise<RoommateProfile | null> {
+    const response = await fetch(`${API_BASE}/roommates/profiles/me`, {
+      headers: await createHeaders(),
+    });
+    const data = await parseResponse<unknown>(
+      response,
+      "Failed to fetch roommate profile",
+    );
+    return data ? roommateProfileSchema.parse(data) : null;
   },
 
   async saveRoommateProfile(
@@ -329,49 +411,112 @@ export const api = {
     );
   },
 
-  async getVerificationTasks(): Promise<VerificationTask[]> {
-    const response = await fetch(`${API_BASE}/admin/verifications`, {
-      headers: await createHeaders(),
-    });
-    return z.array(verificationTaskSchema).parse(
-      await parseResponse(response, "Failed to fetch verification queue"),
-    );
-  },
-
-  async updateVerificationTask(
-    id: string,
-    status: VerificationStatus,
-  ): Promise<VerificationTask> {
-    const response = await fetch(`${API_BASE}/admin/verifications/${id}`, {
-      method: "PATCH",
+  async createListingImageUploadUrl(input: {
+    fileName: string;
+    contentType: string;
+    fileSize: number;
+    listingId?: string;
+  }): Promise<{
+    bucket: string;
+    path: string;
+    token: string;
+    signedUploadUrl: string;
+    assetUrl: string;
+  }> {
+    const response = await fetch(`${API_BASE}/uploads/listing-images/signed-url`, {
+      method: "POST",
       headers: await createHeaders(true),
-      body: JSON.stringify({ status }),
+      body: JSON.stringify(input),
     });
-    return verificationTaskSchema.parse(
-      await parseResponse(response, "Failed to update verification task"),
-    );
+    return z
+      .object({
+        bucket: z.string(),
+        path: z.string(),
+        token: z.string(),
+        signedUploadUrl: z.string().url(),
+        assetUrl: z.string().url(),
+      })
+      .parse(
+        await parseResponse(response, "Failed to prepare listing image upload"),
+      );
   },
 
-  async getDisputes(): Promise<DisputeCase[]> {
-    const response = await fetch(`${API_BASE}/admin/disputes`, {
-      headers: await createHeaders(),
-    });
-    return z.array(disputeCaseSchema).parse(
-      await parseResponse(response, "Failed to fetch disputes"),
+  async createContractDocumentUploadUrl(input: {
+    contractId: string;
+    fileName: string;
+    contentType: string;
+    fileSize: number;
+  }): Promise<{
+    bucket: string;
+    path: string;
+    token: string;
+    signedUploadUrl: string;
+    signedReadUrl: string;
+    expiresInSeconds: number;
+  }> {
+    const response = await fetch(
+      `${API_BASE}/uploads/contract-documents/signed-url`,
+      {
+        method: "POST",
+        headers: await createHeaders(true),
+        body: JSON.stringify(input),
+      },
     );
+    return z
+      .object({
+        bucket: z.string(),
+        path: z.string(),
+        token: z.string(),
+        signedUploadUrl: z.string().url(),
+        signedReadUrl: z.string().url(),
+        expiresInSeconds: z.number().int().positive(),
+      })
+      .parse(
+        await parseResponse(
+          response,
+          "Failed to prepare contract document upload",
+        ),
+      );
   },
 
-  async updateDisputeStatus(
-    id: string,
-    status: DisputeCase["status"],
-  ): Promise<DisputeCase> {
-    const response = await fetch(`${API_BASE}/admin/disputes/${id}`, {
-      method: "PATCH",
+  async uploadFileToSignedUrl(input: { signedUploadUrl: string; file: File }) {
+    const response = await fetch(input.signedUploadUrl, {
+      method: "PUT",
+      headers: {
+        "Content-Type": input.file.type,
+      },
+      body: input.file,
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to upload file to storage");
+    }
+  },
+
+  async registerContractDocument(
+    contractId: string,
+    input: {
+      name: string;
+      type: string;
+      path: string;
+    },
+  ) {
+    const response = await fetch(`${API_BASE}/contracts/${contractId}/documents`, {
+      method: "POST",
       headers: await createHeaders(true),
-      body: JSON.stringify({ status }),
+      body: JSON.stringify(input),
     });
-    return disputeCaseSchema.parse(
-      await parseResponse(response, "Failed to update dispute"),
-    );
+
+    return z
+      .object({
+        id: z.string(),
+        name: z.string(),
+        type: z.string(),
+        uploadedAt: z.coerce.date(),
+        fileUrl: z.string().url().optional(),
+      })
+      .parse(
+        await parseResponse(response, "Failed to register contract document"),
+      );
   },
 };

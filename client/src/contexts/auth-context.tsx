@@ -7,7 +7,7 @@ import {
   waitForAuthProfile,
 } from "@/lib/supabase";
 
-type RegistrationRole = Exclude<UserRole, "admin">;
+type RegistrationRole = UserRole;
 
 export type SignInInput = {
   email: string;
@@ -58,6 +58,7 @@ let authState = initialState;
 let initializePromise: Promise<void> | null = null;
 let authSubscriptionCleanup: (() => void) | null = null;
 let hasInitialized = false;
+let hasSessionExpiryListener = false;
 
 function emitAuthState(nextState: AuthState) {
   authState = nextState;
@@ -84,6 +85,21 @@ function subscribe(callback: () => void) {
 
 function getSnapshot() {
   return authState;
+}
+
+function registerSessionExpiryListener() {
+  if (hasSessionExpiryListener || typeof window === "undefined") {
+    return;
+  }
+
+  hasSessionExpiryListener = true;
+  window.addEventListener("sabai:session-expired", () => {
+    updateAuthState({
+      session: null,
+      profile: null,
+      isLoading: false,
+    });
+  });
 }
 
 async function resolveProfile(userId: string) {
@@ -157,6 +173,7 @@ export async function initializeAuth() {
       updateAuthState({
         isConfigured: true,
       });
+      registerSessionExpiryListener();
 
       if (!authSubscriptionCleanup) {
         const { data: subscription } = client.auth.onAuthStateChange(

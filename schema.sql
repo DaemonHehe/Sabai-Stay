@@ -1,4 +1,4 @@
--- SabaiStay persistent Supabase schema
+-- Sabai Stay persistent Supabase schema
 -- Run this in the Supabase SQL editor.
 
 create extension if not exists pgcrypto;
@@ -1656,3 +1656,4 @@ create policy "admins can update disputes"
   with check (public.is_admin());
 
 -- The Express backend is expected to use SUPABASE_SERVICE_ROLE_KEY for writes.
+

@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1220" viewBox="0 0 1800 1220" role="img" aria-labelledby="title desc">
-  <title id="title">SabaiStay Database Schema (Ultra-Simple)</title>
-  <desc id="desc">Ultra-simple academic UML-style database schema for core SabaiStay tables.</desc>
+  <title id="title">Sabai Stay Database Schema (Ultra-Simple)</title>
+  <desc id="desc">Ultra-simple academic UML-style database schema for core Sabai Stay tables.</desc>
   <defs>
     <style>
       .bg { fill: #f8fafc; }
@@ -23,7 +23,7 @@
   </defs>
 
   <rect class="bg" x="0" y="0" width="1800" height="1220" />
-  <text class="title" x="40" y="58">SabaiStay Database Schema</text>
+  <text class="title" x="40" y="58">Sabai Stay Database Schema</text>
   <text class="subtitle" x="40" y="88">Ultra-simple academic UML-style view of core tables and foreign-key directions.</text>
 
   <g transform="translate(140 180)">
@@ -123,3 +123,4 @@
   <text class="note-text" x="64" y="1116">This diagram is intentionally simplified for academic presentation and keeps only core workflow tables.</text>
   <text class="note-text" x="64" y="1142">Direction shows FK → referenced PK. <tspan class="pk">PK</tspan> primary key, <tspan class="fk">FK</tspan> foreign key.</text>
 </svg>
+

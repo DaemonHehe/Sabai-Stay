@@ -18,6 +18,7 @@ import {
   type ListingFilters,
   type Notification,
   type OwnerAnalytics,
+  type PublicRoommateProfile,
   type Review,
   type RoommateMatch,
   type RoommateMessage,
@@ -41,6 +42,12 @@ import {
   verificationTaskSchema,
 } from "@shared/schema";
 import { seedListings } from "./seed-data";
+import {
+  asAppUserRole,
+  calculateOwnerAnalyticsFrom,
+  paginateArray,
+  toPublicRoommateProfile,
+} from "./storage/storage-helpers";
 
 function hasOverlap(booking: Booking, checkIn: Date, checkOut: Date) {
   return booking.checkOut > checkIn && booking.checkIn < checkOut;
@@ -196,7 +203,7 @@ function normalizeAppUserRow(row: {
 }) {
   return appUserSchema.parse({
     id: row.id,
-    role: row.role,
+    role: asAppUserRole(row.role),
     fullName: row.full_name,
     phone: row.phone,
     avatarUrl: row.avatar_url,
@@ -217,9 +224,27 @@ export class StorageError extends Error {
   }
 }
 
+type PaginationOptions = {
+  page: number;
+  pageSize: number;
+};
+
+type PaginatedResult<T> = {
+  items: T[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+};
+
 export interface IStorage {
   getAppUserById(id: string): Promise<AppUser | null>;
   getAllListings(filters?: ListingFilters): Promise<Listing[]>;
+  getListingsPage(
+    filters: ListingFilters | undefined,
+    options: PaginationOptions,
+  ): Promise<PaginatedResult<Listing>>;
+  getListingsByOwner(ownerUserId: string): Promise<Listing[]>;
   getListingById(id: string): Promise<Listing | undefined>;
   createListing(listing: InsertListing): Promise<Listing>;
   updateListing(
@@ -233,12 +258,22 @@ export interface IStorage {
     waterUsageUnits?: number,
   ): Promise<UtilityEstimate>;
   createBooking(booking: InsertBooking): Promise<Booking>;
-  getBookings(): Promise<Booking[]>;
+  getBookings(userId?: string): Promise<Booking[]>;
+  getBookingsPage(
+    userId: string,
+    options: PaginationOptions,
+  ): Promise<PaginatedResult<Booking>>;
+  getBookingById(id: string): Promise<Booking | undefined>;
   updateBookingStatus(
     id: string,
     status: BookingStatus,
   ): Promise<Booking | undefined>;
-  getContracts(): Promise<Contract[]>;
+  getContracts(userId?: string): Promise<Contract[]>;
+  getContractsPage(
+    userId: string,
+    options: PaginationOptions,
+  ): Promise<PaginatedResult<Contract>>;
+  getContractById(id: string): Promise<Contract | undefined>;
   updateContractStatus(
     id: string,
     status: ContractStatus,
@@ -247,8 +282,9 @@ export interface IStorage {
   getReviewsByListing(listingId: string): Promise<Review[]>;
   createReview(review: InsertReview): Promise<Review>;
   respondToReview(id: string, response: string): Promise<Review | undefined>;
+  getPublicRoommateProfiles(userId: string): Promise<PublicRoommateProfile[]>;
   getRoommateProfileById(id: string): Promise<RoommateProfile | undefined>;
-  getRoommateProfiles(): Promise<RoommateProfile[]>;
+  getRoommateProfiles(userId?: string): Promise<RoommateProfile[]>;
   saveRoommateProfile(
     profile: Omit<RoommateProfile, "id" | "createdAt" | "updatedAt">,
   ): Promise<RoommateProfile>;
@@ -265,7 +301,10 @@ export interface IStorage {
     id: string,
     userId?: string,
   ): Promise<Notification | undefined>;
-  getDashboardData(): Promise<DashboardData>;
+  getDashboardData(
+    userId: string,
+    role: AppUser["role"],
+  ): Promise<DashboardData>;
   getVerificationTasks(): Promise<VerificationTask[]>;
   updateVerificationTask(
     id: string,
@@ -278,7 +317,7 @@ export interface IStorage {
   ): Promise<DisputeCase | undefined>;
 }
 
-class MemoryStorage implements IStorage {
+export class MemoryStorage implements IStorage {
   private readonly universities: University[];
   private readonly campusZones: CampusZone[];
   private readonly transportRoutes: TransportRoute[];
@@ -581,7 +620,7 @@ class MemoryStorage implements IStorage {
         type: "verification",
         title: "Owner verification pending",
         body: "One owner business registration document needs review.",
-        userRole: "admin",
+        userRole: "owner",
         read: false,
         createdAt: new Date("2026-04-02T08:15:00"),
       }),
@@ -631,9 +670,7 @@ class MemoryStorage implements IStorage {
       id,
       role: id.startsWith("owner")
         ? "owner"
-        : id.startsWith("admin")
-          ? "admin"
-          : "student",
+        : "student",
       full_name: null,
       phone: null,
       avatar_url: null,
@@ -675,31 +712,11 @@ class MemoryStorage implements IStorage {
     ];
   }
 
-  private calculateOwnerAnalytics(): OwnerAnalytics {
-    const activeListings = this.listings.filter(
-      (listing) => listing.listingStatus === "active",
-    );
-    const pendingRequests = this.bookings.filter(
-      (booking) => booking.status === "requested" || booking.status === "deposit_pending",
-    ).length;
-    const confirmedBookings = this.bookings.filter(
-      (booking) => booking.status === "confirmed",
-    );
-
-    return {
-      listingCount: this.listings.length,
-      activeListings: activeListings.length,
-      pendingRequests,
-      occupancyRate:
-        this.listings.length === 0
-          ? 0
-          : Math.round((confirmedBookings.length / this.listings.length) * 100),
-      responseRate: 92,
-      confirmedRevenue: confirmedBookings.reduce(
-        (total, booking) => total + booking.totalPrice,
-        0,
-      ),
-    };
+  private calculateOwnerAnalytics(
+    ownerListings: Listing[] = this.listings,
+    ownerBookings: Booking[] = this.bookings,
+  ): OwnerAnalytics {
+    return calculateOwnerAnalyticsFrom(ownerListings, ownerBookings);
   }
 
   private createOrUpdateContractForBooking(booking: Booking) {
@@ -825,6 +842,17 @@ class MemoryStorage implements IStorage {
     });
   }
 
+  async getListingsPage(
+    filters: ListingFilters | undefined,
+    options: PaginationOptions,
+  ): Promise<PaginatedResult<Listing>> {
+    return paginateArray(await this.getAllListings(filters), options);
+  }
+
+  async getListingsByOwner(ownerUserId: string): Promise<Listing[]> {
+    return this.listings.filter((listing) => listing.ownerUserId === ownerUserId);
+  }
+
   async getListingById(id: string): Promise<Listing | undefined> {
     return this.listings.find((listing) => listing.id === id);
   }
@@ -834,9 +862,10 @@ class MemoryStorage implements IStorage {
     this.listings = [created, ...this.listings];
     this.addNotification(
       "system",
-      "admin",
+      "owner",
       "New listing submitted",
       `${created.title} was submitted and is awaiting moderation.`,
+      created.ownerUserId,
     );
     return created;
   }
@@ -913,8 +942,26 @@ class MemoryStorage implements IStorage {
     return created;
   }
 
-  async getBookings(): Promise<Booking[]> {
-    return [...this.bookings];
+  async getBookings(userId?: string): Promise<Booking[]> {
+    if (!userId) {
+      return [...this.bookings];
+    }
+
+    return this.bookings.filter(
+      (booking) =>
+        booking.ownerUserId === userId || booking.studentUserId === userId,
+    );
+  }
+
+  async getBookingsPage(
+    userId: string,
+    options: PaginationOptions,
+  ): Promise<PaginatedResult<Booking>> {
+    return paginateArray(await this.getBookings(userId), options);
+  }
+
+  async getBookingById(id: string): Promise<Booking | undefined> {
+    return this.bookings.find((booking) => booking.id === id);
   }
 
   async updateBookingStatus(
@@ -960,8 +1007,26 @@ class MemoryStorage implements IStorage {
     return nextBooking;
   }
 
-  async getContracts(): Promise<Contract[]> {
-    return [...this.contracts];
+  async getContracts(userId?: string): Promise<Contract[]> {
+    if (!userId) {
+      return [...this.contracts];
+    }
+
+    return this.contracts.filter(
+      (contract) =>
+        contract.ownerUserId === userId || contract.studentUserId === userId,
+    );
+  }
+
+  async getContractsPage(
+    userId: string,
+    options: PaginationOptions,
+  ): Promise<PaginatedResult<Contract>> {
+    return paginateArray(await this.getContracts(userId), options);
+  }
+
+  async getContractById(id: string): Promise<Contract | undefined> {
+    return this.contracts.find((contract) => contract.id === id);
   }
 
   async updateContractStatus(
@@ -1033,8 +1098,22 @@ class MemoryStorage implements IStorage {
     return updated;
   }
 
-  async getRoommateProfiles(): Promise<RoommateProfile[]> {
-    return [...this.roommateProfiles];
+  async getRoommateProfiles(userId?: string): Promise<RoommateProfile[]> {
+    if (!userId) {
+      return [...this.roommateProfiles];
+    }
+
+    return this.roommateProfiles.filter(
+      (profile) => profile.userId === userId || profile.isActive,
+    );
+  }
+
+  async getPublicRoommateProfiles(
+    userId: string,
+  ): Promise<PublicRoommateProfile[]> {
+    return this.roommateProfiles
+      .filter((profile) => profile.userId === userId || profile.isActive)
+      .map(toPublicRoommateProfile);
   }
 
   async getRoommateProfileById(id: string): Promise<RoommateProfile | undefined> {
@@ -1170,18 +1249,37 @@ class MemoryStorage implements IStorage {
     return updated;
   }
 
-  async getDashboardData(): Promise<DashboardData> {
+  async getDashboardData(
+    userId: string,
+    role: AppUser["role"],
+  ): Promise<DashboardData> {
+    const ownerListings =
+      role === "owner" ? await this.getListingsByOwner(userId) : [];
+    const ownerBookings = await this.getBookings(userId);
+    const contracts = await this.getContracts(userId);
+    const roommateProfiles = await this.getRoommateProfiles(userId);
+    const viewerProfile =
+      roommateProfiles.find((profile) => profile.userId === userId) ?? null;
+    const roommateMatches = viewerProfile
+      ? await this.getRoommateMatches(viewerProfile.id)
+      : [];
+    const matchIds = new Set(roommateMatches.map((match) => match.id));
+    const roommateMessages = this.roommateMessages.filter((message) =>
+      matchIds.has(message.matchId),
+    );
+    const notifications = await this.getNotifications(userId);
+
     return dashboardDataSchema.parse({
-      ownerAnalytics: this.calculateOwnerAnalytics(),
-      ownerListings: this.listings,
-      ownerBookings: this.bookings,
-      contracts: this.contracts,
-      roommateProfiles: this.roommateProfiles,
-      roommateMatches: await this.getRoommateMatches(),
-      roommateMessages: this.roommateMessages,
-      verificationTasks: this.verificationTasks,
-      disputes: this.disputes,
-      notifications: this.notifications,
+      ownerAnalytics: this.calculateOwnerAnalytics(ownerListings, ownerBookings),
+      ownerListings,
+      ownerBookings,
+      contracts,
+      roommateProfiles,
+      roommateMatches,
+      roommateMessages,
+      verificationTasks: [],
+      disputes: [],
+      notifications,
     });
   }
 
@@ -1205,7 +1303,7 @@ class MemoryStorage implements IStorage {
     this.verificationTasks[index] = updated;
     this.addNotification(
       "verification",
-      "admin",
+      "owner",
       "Verification updated",
       `${updated.name} is now ${status}.`,
     );
@@ -1460,6 +1558,7 @@ class SupabaseStorage implements IStorage {
           id: document.id,
           name: document.name,
           type: document.type,
+          fileUrl: document.file_url ?? null,
           uploadedAt: document.uploaded_at,
         })),
       signedByStudent: row.signed_by_student,
@@ -1507,7 +1606,7 @@ class SupabaseStorage implements IStorage {
     return notificationSchema.parse({
       id: row.id,
       userId: row.user_id ?? undefined,
-      userRole: row.user_role,
+      userRole: asAppUserRole(row.user_role),
       type: row.type,
       title: row.title,
       body: row.body,
@@ -1570,6 +1669,83 @@ class SupabaseStorage implements IStorage {
         value.toLowerCase().includes(normalized),
       ),
     );
+  }
+
+  async getListingsPage(
+    filters: ListingFilters | undefined,
+    options: PaginationOptions,
+  ): Promise<PaginatedResult<Listing>> {
+    const page = Math.max(1, options.page);
+    const pageSize = Math.max(1, options.pageSize);
+    const from = (page - 1) * pageSize;
+    const to = from + pageSize - 1;
+
+    let query = this.supabase
+      .from("listings")
+      .select("*", { count: "exact" })
+      .neq("listing_status", "archived");
+
+    if (filters?.category && filters.category !== "ALL") {
+      query = query.eq("category", filters.category);
+    }
+    if (filters?.universityId) {
+      query = query.eq("university_id", filters.universityId);
+    }
+    if (filters?.campusZoneId) {
+      query = query.eq("nearest_campus_zone_id", filters.campusZoneId);
+    }
+    if (filters?.roomType) {
+      query = query.eq("room_type", filters.roomType);
+    }
+    if (filters?.minPrice !== undefined) {
+      query = query.gte("price", filters.minPrice);
+    }
+    if (filters?.maxPrice !== undefined) {
+      query = query.lte("price", filters.maxPrice);
+    }
+    if (filters?.minCapacity !== undefined) {
+      query = query.gte("capacity", filters.minCapacity);
+    }
+    if (filters?.maxWalkingMinutes !== undefined) {
+      query = query.lte("walking_minutes", filters.maxWalkingMinutes);
+    }
+    if (filters?.q?.trim()) {
+      const queryText = filters.q.trim().replaceAll(",", " ");
+      const searchPattern = `%${queryText}%`;
+      query = query.or(
+        [
+          `title.ilike.${searchPattern}`,
+          `location.ilike.${searchPattern}`,
+          `description.ilike.${searchPattern}`,
+          `category.ilike.${searchPattern}`,
+          `room_type.ilike.${searchPattern}`,
+        ].join(","),
+      );
+    }
+
+    const { data, error, count } = await query
+      .order("created_at", { ascending: false })
+      .range(from, to);
+    throwSupabaseError(error);
+
+    const total = count ?? 0;
+    return {
+      items: (data ?? []).map((row) => this.normalizeListingRow(row)),
+      page,
+      pageSize,
+      total,
+      totalPages: Math.ceil(total / pageSize),
+    };
+  }
+
+  async getListingsByOwner(ownerUserId: string): Promise<Listing[]> {
+    const { data, error } = await this.supabase
+      .from("listings")
+      .select("*")
+      .eq("owner_user_id", ownerUserId)
+      .order("created_at", { ascending: false });
+    throwSupabaseError(error);
+    return (data ?? []).map((row) => this.normalizeListingRow(row));
   }
 
   async getListingById(id: string): Promise<Listing | undefined> {
@@ -1732,15 +1908,66 @@ class SupabaseStorage implements IStorage {
     return this.normalizeBookingRow(data, timelineRows);
   }
 
-  async getBookings(): Promise<Booking[]> {
-    const { data, error } = await this.supabase
+  async getBookings(userId?: string): Promise<Booking[]> {
+    let query = this.supabase
       .from("bookings")
       .select("*")
       .order("created_at", { ascending: false });
+    if (userId) {
+      query = query.or(`owner_user_id.eq.${userId},student_user_id.eq.${userId}`);
+    }
+    const { data, error } = await query;
     throwSupabaseError(error);
     const bookingRows = data ?? [];
     const timelineRows = await this.loadTimelineRows(bookingRows.map((row) => row.id));
     return bookingRows.map((row) => this.normalizeBookingRow(row, timelineRows));
+  }
+
+  async getBookingsPage(
+    userId: string,
+    options: PaginationOptions,
+  ): Promise<PaginatedResult<Booking>> {
+    const page = Math.max(1, options.page);
+    const pageSize = Math.max(1, options.pageSize);
+    const from = (page - 1) * pageSize;
+    const to = from + pageSize - 1;
+
+    const { data, error, count } = await this.supabase
+      .from("bookings")
+      .select("*", { count: "exact" })
+      .or(`owner_user_id.eq.${userId},student_user_id.eq.${userId}`)
+      .order("created_at", { ascending: false })
+      .range(from, to);
+    throwSupabaseError(error);
+
+    const bookingRows = data ?? [];
+    const timelineRows = await this.loadTimelineRows(
+      bookingRows.map((row) => row.id),
+    );
+    const total = count ?? 0;
+
+    return {
+      items: bookingRows.map((row) => this.normalizeBookingRow(row, timelineRows)),
+      page,
+      pageSize,
+      total,
+      totalPages: Math.ceil(total / pageSize),
+    };
+  }
+
+  async getBookingById(id: string): Promise<Booking | undefined> {
+    const { data, error } = await this.supabase
+      .from("bookings")
+      .select("*")
+      .eq("id", id)
+      .maybeSingle();
+    throwSupabaseError(error);
+    if (!data) {
+      return undefined;
+    }
+
+    const timelineRows = await this.loadTimelineRows([id]);
+    return this.normalizeBookingRow(data, timelineRows);
   }
 
   async updateBookingStatus(id: string, status: BookingStatus): Promise<Booking | undefined> {
@@ -1795,9 +2022,16 @@ class SupabaseStorage implements IStorage {
     return this.normalizeBookingRow(data, timelineRows);
   }
 
-  async getContracts(): Promise<Contract[]> {
+  async getContracts(userId?: string): Promise<Contract[]> {
+    let contractsQuery = this.supabase
+      .from("contracts")
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (userId) {
+      contractsQuery = contractsQuery.or(`owner_user_id.eq.${userId},student_user_id.eq.${userId}`);
+    }
     const [contractsResult, docsResult] = await Promise.all([
-      this.supabase.from("contracts").select("*").order("created_at", { ascending: false }),
+      contractsQuery,
       this.supabase.from("contract_documents").select("*"),
     ]);
     throwSupabaseError(contractsResult.error);
@@ -1805,6 +2039,67 @@ class SupabaseStorage implements IStorage {
     return (contractsResult.data ?? []).map((row) =>
       this.normalizeContractRow(row, docsResult.data ?? []),
     );
+  }
+
+  async getContractsPage(
+    userId: string,
+    options: PaginationOptions,
+  ): Promise<PaginatedResult<Contract>> {
+    const page = Math.max(1, options.page);
+    const pageSize = Math.max(1, options.pageSize);
+    const from = (page - 1) * pageSize;
+    const to = from + pageSize - 1;
+
+    const contractsResult = await this.supabase
+      .from("contracts")
+      .select("*", { count: "exact" })
+      .or(`owner_user_id.eq.${userId},student_user_id.eq.${userId}`)
+      .order("created_at", { ascending: false })
+      .range(from, to);
+    throwSupabaseError(contractsResult.error);
+
+    const contractRows = contractsResult.data ?? [];
+    const contractIds = contractRows.map((row) => row.id);
+    let documentRows: any[] = [];
+
+    if (contractIds.length > 0) {
+      const docsResult = await this.supabase
+        .from("contract_documents")
+        .select("*")
+        .in("contract_id", contractIds);
+      throwSupabaseError(docsResult.error);
+      documentRows = docsResult.data ?? [];
+    }
+
+    const total = contractsResult.count ?? 0;
+    return {
+      items: contractRows.map((row) =>
+        this.normalizeContractRow(row, documentRows),
+      ),
+      page,
+      pageSize,
+      total,
+      totalPages: Math.ceil(total / pageSize),
+    };
+  }
+
+  async getContractById(id: string): Promise<Contract | undefined> {
+    const { data, error } = await this.supabase
+      .from("contracts")
+      .select("*")
+      .eq("id", id)
+      .maybeSingle();
+    throwSupabaseError(error);
+    if (!data) {
+      return undefined;
+    }
+
+    const { data: docs, error: docsError } = await this.supabase
+      .from("contract_documents")
+      .select("*")
+      .eq("contract_id", id);
+    throwSupabaseError(docsError);
+    return this.normalizeContractRow(data, docs ?? []);
   }
 
   async updateContractStatus(id: string, status: ContractStatus): Promise<Contract | undefined> {
@@ -1892,13 +2187,24 @@ class SupabaseStorage implements IStorage {
     return data ? this.normalizeReviewRow(data) : undefined;
   }
 
-  async getRoommateProfiles(): Promise<RoommateProfile[]> {
-    const { data, error } = await this.supabase
+  async getRoommateProfiles(userId?: string): Promise<RoommateProfile[]> {
+    let query = this.supabase
       .from("roommate_profiles")
       .select("*")
       .order("updated_at", { ascending: false });
+    if (userId) {
+      query = query.or(`user_id.eq.${userId},is_active.eq.true`);
+    }
+    const { data, error } = await query;
     throwSupabaseError(error);
     return (data ?? []).map((row) => this.normalizeRoommateProfileRow(row));
+  }
+
+  async getPublicRoommateProfiles(
+    userId: string,
+  ): Promise<PublicRoommateProfile[]> {
+    const profiles = await this.getRoommateProfiles(userId);
+    return profiles.map(toPublicRoommateProfile);
   }
 
   async getRoommateProfileById(id: string): Promise<RoommateProfile | undefined> {
@@ -2102,44 +2408,56 @@ class SupabaseStorage implements IStorage {
     return data ? this.normalizeNotificationRow(data) : undefined;
   }
 
-  async getDashboardData(): Promise<DashboardData> {
-    const [ownerListings, ownerBookings, contracts, roommateProfiles, roommateMatches, notifications, verificationTasks, disputes] = await Promise.all([
-      this.getAllListings(),
-      this.getBookings(),
-      this.getContracts(),
-      this.getRoommateProfiles(),
-      this.getRoommateMatches(),
-      this.getNotifications(),
-      this.getVerificationTasks(),
-      this.getDisputes(),
-    ]);
+  async getDashboardData(
+    userId: string,
+    role: AppUser["role"],
+  ): Promise<DashboardData> {
+    const [ownerListings, ownerBookings, contracts, roommateProfiles, notifications] =
+      await Promise.all([
+        role === "owner" ? this.getListingsByOwner(userId) : Promise.resolve([]),
+        this.getBookings(userId),
+        this.getContracts(userId),
+        this.getRoommateProfiles(userId),
+        this.getNotifications(userId),
+      ]);
 
-    const { data: roommateMessagesRaw, error: roommateMessagesError } = await this.supabase
-      .from("roommate_messages")
-      .select("*")
-      .order("created_at", { ascending: true });
-    throwSupabaseError(roommateMessagesError);
+    const viewerProfile =
+      roommateProfiles.find((profile) => profile.userId === userId) ?? null;
+    const roommateMatches = viewerProfile
+      ? await this.getRoommateMatches(viewerProfile.id)
+      : [];
+    const matchIds = roommateMatches.map((match) => match.id);
+    let roommateMessages: RoommateMessage[] = [];
 
-    const confirmedBookings = ownerBookings.filter((booking) => booking.status === "confirmed");
-    const ownerAnalytics: OwnerAnalytics = {
-      listingCount: ownerListings.length,
-      activeListings: ownerListings.filter((listing) => listing.listingStatus === "active").length,
-      pendingRequests: ownerBookings.filter((booking) => booking.status === "requested" || booking.status === "deposit_pending").length,
-      occupancyRate: ownerListings.length === 0 ? 0 : Math.round((confirmedBookings.length / ownerListings.length) * 100),
-      responseRate: 92,
-      confirmedRevenue: confirmedBookings.reduce((total, booking) => total + booking.totalPrice, 0),
-    };
+    if (matchIds.length > 0) {
+      const { data: roommateMessagesRaw, error: roommateMessagesError } =
+        await this.supabase
+          .from("roommate_messages")
+          .select("*")
+          .in("match_id", matchIds)
+          .order("created_at", { ascending: true });
+      throwSupabaseError(roommateMessagesError);
+      roommateMessages = (roommateMessagesRaw ?? []).map((row) =>
+        roommateMessageSchema.parse({
+          id: row.id,
+          matchId: row.match_id,
+          senderProfileId: row.sender_profile_id,
+          message: row.message,
+          createdAt: row.created_at,
+        }),
+      );
+    }
 
     return dashboardDataSchema.parse({
-      ownerAnalytics,
+      ownerAnalytics: calculateOwnerAnalyticsFrom(ownerListings, ownerBookings),
       ownerListings,
       ownerBookings,
       contracts,
       roommateProfiles,
       roommateMatches,
-      roommateMessages: (roommateMessagesRaw ?? []).map((row) => roommateMessageSchema.parse({ id: row.id, matchId: row.match_id, senderProfileId: row.sender_profile_id, message: row.message, createdAt: row.created_at })),
-      verificationTasks,
-      disputes,
+      roommateMessages,
+      verificationTasks: [],
+      disputes: [],
       notifications,
     });
   }
@@ -2147,7 +2465,7 @@ class SupabaseStorage implements IStorage {
   async getVerificationTasks(): Promise<VerificationTask[]> {
     const { data, error } = await this.supabase.from("verification_tasks").select("*").order("submitted_at", { ascending: false });
     throwSupabaseError(error);
-    return (data ?? []).map((row) => verificationTaskSchema.parse({ id: row.id, userId: row.user_id, role: row.role, name: row.name, status: row.status, submittedAt: row.submitted_at }));
+    return (data ?? []).map((row) => verificationTaskSchema.parse({ id: row.id, userId: row.user_id, role: asAppUserRole(row.role), name: row.name, status: row.status, submittedAt: row.submitted_at }));
   }
 
   async updateVerificationTask(id: string, status: VerificationStatus): Promise<VerificationTask | undefined> {
@@ -2159,13 +2477,13 @@ class SupabaseStorage implements IStorage {
 
     await this.createNotification({
       type: "verification",
-      userRole: data.role,
+      userRole: asAppUserRole(data.role),
       title: "Verification updated",
       body: `${data.name} is now ${status}.`,
       userId: data.user_id,
     });
 
-    return verificationTaskSchema.parse({ id: data.id, userId: data.user_id, role: data.role, name: data.name, status: data.status, submittedAt: data.submitted_at });
+    return verificationTaskSchema.parse({ id: data.id, userId: data.user_id, role: asAppUserRole(data.role), name: data.name, status: data.status, submittedAt: data.submitted_at });
   }
 
   async getDisputes(): Promise<DisputeCase[]> {
@@ -2247,22 +2565,29 @@ class ResilientStorage implements IStorage {
 
   async getAppUserById(id: string) { return (await this.getBackend()).getAppUserById(id); }
   async getAllListings(filters?: ListingFilters) { return (await this.getBackend()).getAllListings(filters); }
+  async getListingsPage(filters: ListingFilters | undefined, options: PaginationOptions) { return (await this.getBackend()).getListingsPage(filters, options); }
+  async getListingsByOwner(ownerUserId: string) { return (await this.getBackend()).getListingsByOwner(ownerUserId); }
   async getListingById(id: string) { return (await this.getBackend()).getListingById(id); }
   async createListing(listing: InsertListing) { return (await this.getBackend()).createListing(listing); }
   async updateListing(id: string, updates: Partial<InsertListing>) { return (await this.getBackend()).updateListing(id, updates); }
   async getDiscoveryData() { return (await this.getBackend()).getDiscoveryData(); }
   async estimateUtilities(listingId: string, electricityUsageUnits?: number, waterUsageUnits?: number) { return (await this.getBackend()).estimateUtilities(listingId, electricityUsageUnits, waterUsageUnits); }
   async createBooking(booking: InsertBooking) { return (await this.getBackend()).createBooking(booking); }
-  async getBookings() { return (await this.getBackend()).getBookings(); }
+  async getBookings(userId?: string) { return (await this.getBackend()).getBookings(userId); }
+  async getBookingsPage(userId: string, options: PaginationOptions) { return (await this.getBackend()).getBookingsPage(userId, options); }
+  async getBookingById(id: string) { return (await this.getBackend()).getBookingById(id); }
   async updateBookingStatus(id: string, status: BookingStatus) { return (await this.getBackend()).updateBookingStatus(id, status); }
-  async getContracts() { return (await this.getBackend()).getContracts(); }
+  async getContracts(userId?: string) { return (await this.getBackend()).getContracts(userId); }
+  async getContractsPage(userId: string, options: PaginationOptions) { return (await this.getBackend()).getContractsPage(userId, options); }
+  async getContractById(id: string) { return (await this.getBackend()).getContractById(id); }
   async updateContractStatus(id: string, status: ContractStatus) { return (await this.getBackend()).updateContractStatus(id, status); }
   async getReviewById(id: string) { return (await this.getBackend()).getReviewById(id); }
   async getReviewsByListing(listingId: string) { return (await this.getBackend()).getReviewsByListing(listingId); }
   async createReview(review: InsertReview) { return (await this.getBackend()).createReview(review); }
   async respondToReview(id: string, response: string) { return (await this.getBackend()).respondToReview(id, response); }
+  async getPublicRoommateProfiles(userId: string) { return (await this.getBackend()).getPublicRoommateProfiles(userId); }
   async getRoommateProfileById(id: string) { return (await this.getBackend()).getRoommateProfileById(id); }
-  async getRoommateProfiles() { return (await this.getBackend()).getRoommateProfiles(); }
+  async getRoommateProfiles(userId?: string) { return (await this.getBackend()).getRoommateProfiles(userId); }
   async saveRoommateProfile(profile: Omit<RoommateProfile, "id" | "createdAt" | "updatedAt">) { return (await this.getBackend()).saveRoommateProfile(profile); }
   async getRoommateMatchById(id: string) { return (await this.getBackend()).getRoommateMatchById(id); }
   async getRoommateMatches(profileId?: string) { return (await this.getBackend()).getRoommateMatches(profileId); }
@@ -2270,7 +2595,7 @@ class ResilientStorage implements IStorage {
   async sendRoommateMessage(matchId: string, senderProfileId: string, message: string) { return (await this.getBackend()).sendRoommateMessage(matchId, senderProfileId, message); }
   async getNotifications(userId?: string) { return (await this.getBackend()).getNotifications(userId); }
   async markNotificationRead(id: string, userId?: string) { return (await this.getBackend()).markNotificationRead(id, userId); }
-  async getDashboardData() { return (await this.getBackend()).getDashboardData(); }
+  async getDashboardData(userId: string, role: AppUser["role"]) { return (await this.getBackend()).getDashboardData(userId, role); }
   async getVerificationTasks() { return (await this.getBackend()).getVerificationTasks(); }
   async updateVerificationTask(id: string, status: VerificationStatus) { return (await this.getBackend()).updateVerificationTask(id, status); }
   async getDisputes() { return (await this.getBackend()).getDisputes(); }

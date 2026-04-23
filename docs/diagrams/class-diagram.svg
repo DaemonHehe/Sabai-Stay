@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1180" viewBox="0 0 1800 1180" role="img" aria-labelledby="title desc">
-  <title id="title">SabaiStay Class Diagram</title>
-  <desc id="desc">Ultra-simple academic UML class diagram for SabaiStay showing the main user roles and core business classes.</desc>
+  <title id="title">Sabai Stay Class Diagram</title>
+  <desc id="desc">Ultra-simple academic UML class diagram for Sabai Stay showing the main user roles and core business classes.</desc>
   <defs>
     <style>
       .bg { fill: #f8fafc; }
@@ -27,7 +27,7 @@
   </defs>
 
   <rect class="bg" x="0" y="0" width="1800" height="1180" />
-  <text class="title" x="40" y="56">SabaiStay Class Diagram</text>
+  <text class="title" x="40" y="56">Sabai Stay Class Diagram</text>
   <text class="subtitle" x="40" y="86">Ultra-simple academic UML view of the main roles and core business classes.</text>
 
   <g transform="translate(760 120)">
@@ -130,5 +130,6 @@
 
   <rect class="note" x="40" y="1090" width="1720" height="72" />
   <text class="note-text" x="66" y="1120">This academic UML diagram intentionally simplifies the implementation by modeling Student and Owner as role specializations of User. It focuses only on the core business classes needed to explain the platform clearly.</text>
-  <text class="note-text" x="66" y="1144">Suggested caption: "Simplified UML class diagram of SabaiStay showing users, listings, bookings, contracts, and roommate profiles."</text>
+  <text class="note-text" x="66" y="1144">Suggested caption: "Simplified UML class diagram of Sabai Stay showing users, listings, bookings, contracts, and roommate profiles."</text>
 </svg>
+

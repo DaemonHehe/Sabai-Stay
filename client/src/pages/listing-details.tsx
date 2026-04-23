@@ -16,6 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
+import { useAuth } from "@/contexts/auth-context";
 import NotFound from "./not-found";
 
 function BookingModal({
@@ -69,6 +70,7 @@ function BookingModal({
 export default function ListingDetails() {
   const [, params] = useRoute("/listing/:id");
   const { toast } = useToast();
+  const { user, profile } = useAuth();
   const [isBookingOpen, setIsBookingOpen] = useState(false);
   const [utilityUsage, setUtilityUsage] = useState({
     electricityUsageUnits: 120,
@@ -84,8 +86,6 @@ export default function ListingDetails() {
     requestNote: "",
   });
   const [reviewData, setReviewData] = useState({
-    studentUserId: "student-001",
-    studentName: "Current Student",
     rating: 5,
     comment: "",
   });
@@ -184,6 +184,15 @@ export default function ListingDetails() {
           reviews.reduce((total, review) => total + review.rating, 0) / reviews.length
         ).toFixed(1)
       : listing?.rating ?? "0.0";
+
+  const viewerRole = profile?.appUser.role ?? null;
+  const viewerUserId = profile?.appUser.id ?? null;
+  const viewerDisplayName =
+    profile?.appUser.fullName ?? user?.email ?? "Student";
+  const canCreateReview = viewerRole === "student" && Boolean(viewerUserId);
+  const canRespondToReview =
+    viewerRole === "owner" && viewerUserId === listing?.ownerUserId;
+  const canRequestBooking = canCreateReview;
 
   if (isLoading) {
     return (
@@ -403,7 +412,7 @@ export default function ListingDetails() {
                           <p className="font-semibold">Owner response</p>
                           <p className="mt-2 opacity-70">{review.ownerResponse}</p>
                         </div>
-                      ) : (
+                      ) : canRespondToReview ? (
                         <div className="mt-4 space-y-2">
                           <Textarea
                             placeholder="Write an owner response"
@@ -428,30 +437,21 @@ export default function ListingDetails() {
                             Post Owner Response
                           </Button>
                         </div>
-                      )}
+                      ) : null}
                     </div>
                   ))}
                 </div>
 
-                <div
-                  className="mt-6 rounded-sm border p-5"
-                  style={{
-                    backgroundColor: "var(--color-secondary)",
-                    borderColor: "var(--color-border)",
-                  }}
-                >
-                  <p className="font-display font-bold uppercase">Leave a review</p>
-                  <div className="mt-4 space-y-3">
-                    <div className="grid gap-3 md:grid-cols-2">
-                      <Input
-                        value={reviewData.studentName}
-                        onChange={(event) =>
-                          setReviewData((current) => ({
-                            ...current,
-                            studentName: event.target.value,
-                          }))
-                        }
-                      />
+                {canCreateReview ? (
+                  <div
+                    className="mt-6 rounded-sm border p-5"
+                    style={{
+                      backgroundColor: "var(--color-secondary)",
+                      borderColor: "var(--color-border)",
+                    }}
+                  >
+                    <p className="font-display font-bold uppercase">Leave a review</p>
+                    <div className="mt-4 space-y-3">
                       <Input
                         type="number"
                         min={1}
@@ -464,33 +464,37 @@ export default function ListingDetails() {
                           }))
                         }
                       />
+                      <Textarea
+                        placeholder="Share your stay experience"
+                        value={reviewData.comment}
+                        onChange={(event) =>
+                          setReviewData((current) => ({
+                            ...current,
+                            comment: event.target.value,
+                          }))
+                        }
+                      />
+                      <Button
+                        onClick={() =>
+                          reviewMutation.mutate({
+                            listingId: listing.id,
+                            studentUserId: viewerUserId!,
+                            studentName: viewerDisplayName,
+                            rating: reviewData.rating,
+                            comment: reviewData.comment,
+                          })
+                        }
+                        disabled={!reviewData.comment.trim()}
+                      >
+                        Submit Review
+                      </Button>
                     </div>
-                    <Textarea
-                      placeholder="Share your stay experience"
-                      value={reviewData.comment}
-                      onChange={(event) =>
-                        setReviewData((current) => ({
-                          ...current,
-                          comment: event.target.value,
-                        }))
-                      }
-                    />
-                    <Button
-                      onClick={() =>
-                        reviewMutation.mutate({
-                          listingId: listing.id,
-                          studentUserId: reviewData.studentUserId,
-                          studentName: reviewData.studentName,
-                          rating: reviewData.rating,
-                          comment: reviewData.comment,
-                        })
-                      }
-                      disabled={!reviewData.comment.trim()}
-                    >
-                      Submit Review
-                    </Button>
                   </div>
-                </div>
+                ) : (
+                  <p className="mt-6 text-sm opacity-60">
+                    Sign in as a student to submit a review.
+                  </p>
+                )}
               </section>
             </div>
 
@@ -522,9 +526,16 @@ export default function ListingDetails() {
                   <Button
                     onClick={() => setIsBookingOpen(true)}
                     className="w-full h-14 bg-primary text-primary-foreground font-display font-bold text-base uppercase tracking-widest hover:opacity-90 transition-opacity rounded-sm"
+                    disabled={!canRequestBooking}
                   >
                     Request Booking
                   </Button>
+
+                  {!canRequestBooking ? (
+                    <p className="mt-3 text-center text-xs opacity-50">
+                      Sign in as a student to request booking.
+                    </p>
+                  ) : null}
 
                   <p className="mt-4 text-center text-xs opacity-40 font-mono">
                     Workflow: Request → Approval → Deposit → Confirmed

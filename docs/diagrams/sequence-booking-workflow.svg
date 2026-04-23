@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1180" viewBox="0 0 1800 1180" role="img" aria-labelledby="title desc">
-  <title id="title">SabaiStay Booking Workflow Sequence Diagram (Ultra-Simple)</title>
-  <desc id="desc">Ultra-simple academic sequence diagram for SabaiStay booking request and approval workflow.</desc>
+  <title id="title">Sabai Stay Booking Workflow Sequence Diagram (Ultra-Simple)</title>
+  <desc id="desc">Ultra-simple academic sequence diagram for Sabai Stay booking request and approval workflow.</desc>
   <defs>
     <style>
       .bg { fill: #f8fafc; }
@@ -26,7 +26,7 @@
   </defs>
 
   <rect class="bg" x="0" y="0" width="1800" height="1180" />
-  <text class="title" x="40" y="58">SabaiStay Booking Workflow Sequence Diagram</text>
+  <text class="title" x="40" y="58">Sabai Stay Booking Workflow Sequence Diagram</text>
   <text class="subtitle" x="40" y="88">Ultra-simple academic flow from request submission to owner approval update.</text>
 
   <g transform="translate(100 110)">
@@ -99,3 +99,4 @@
   <text class="label" x="220" y="900">12. Student sees approved/rejected/confirmed</text>
 
 </svg>
+

@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1150" viewBox="0 0 1800 1150" role="img" aria-labelledby="title desc">
-  <title id="title">SabaiStay ERD (Ultra-Simple)</title>
-  <desc id="desc">Ultra-simple academic ERD for SabaiStay with core entities and clear cardinality arrows.</desc>
+  <title id="title">Sabai Stay ERD (Ultra-Simple)</title>
+  <desc id="desc">Ultra-simple academic ERD for Sabai Stay with core entities and clear cardinality arrows.</desc>
   <defs>
     <style>
       .bg { fill: #f8fafc; }
@@ -22,7 +22,7 @@
   </defs>
 
   <rect class="bg" x="0" y="0" width="1800" height="1150" />
-  <text class="title" x="40" y="58">SabaiStay ERD</text>
+  <text class="title" x="40" y="58">Sabai Stay ERD</text>
   <text class="subtitle" x="40" y="88">Ultra-simple academic ERD of core entities and relationship cardinalities.</text>
 
   <g transform="translate(120 150)">
@@ -143,5 +143,6 @@
 
   <rect class="note" x="40" y="1040" width="1720" height="82" />
   <text class="note-text" x="64" y="1072">This ERD is intentionally simplified for academic presentation. It focuses on core entities and primary cardinalities.</text>
-  <text class="note-text" x="64" y="1098">Recommended caption: "Ultra-simple ERD of SabaiStay core entities and relationships."</text>
+  <text class="note-text" x="64" y="1098">Recommended caption: "Ultra-simple ERD of Sabai Stay core entities and relationships."</text>
 </svg>
+

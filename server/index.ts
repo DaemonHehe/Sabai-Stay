@@ -1,9 +1,16 @@
 import "../env";
+import { randomUUID } from "node:crypto";
 import express, { type Request, Response, NextFunction } from "express";
+import cors from "cors";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { initializeStorage } from "./storage";
 import { createServer } from "http";
+import { trackError } from "./observability/error-tracker";
+import { logEvent } from "./observability/logger";
+import { getMetricsSnapshot, recordHttpMetric } from "./observability/metrics";
 
 const app = express();
 const httpServer = createServer(app);
@@ -13,6 +20,169 @@ declare module "http" {
     rawBody: unknown;
   }
 }
+
+declare global {
+  namespace Express {
+    interface Request {
+      requestId: string;
+    }
+  }
+}
+
+app.set("trust proxy", 1);
+app.disable("x-powered-by");
+
+function parseNumericEnv(value: string | undefined, fallback: number) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return fallback;
+  }
+  return parsed;
+}
+
+function parseBooleanEnv(value: string | undefined, fallback: boolean) {
+  if (!value) {
+    return fallback;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "1" || normalized === "true" || normalized === "yes") {
+    return true;
+  }
+  if (normalized === "0" || normalized === "false" || normalized === "no") {
+    return false;
+  }
+
+  return fallback;
+}
+
+function getAllowedCorsOrigins() {
+  const configured = (process.env.CORS_ALLOWED_ORIGINS ?? "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+  if (configured.length > 0) {
+    return new Set(configured);
+  }
+
+  if (process.env.NODE_ENV !== "production") {
+    return new Set([
+      "http://localhost:5000",
+      "http://127.0.0.1:5000",
+      "http://localhost:5173",
+      "http://127.0.0.1:5173",
+    ]);
+  }
+
+  const appBaseUrl = process.env.APP_BASE_URL?.trim();
+  return new Set(appBaseUrl ? [appBaseUrl] : []);
+}
+
+function getHelmetConfig() {
+  if (process.env.NODE_ENV !== "production") {
+    return {
+      contentSecurityPolicy: false,
+      crossOriginEmbedderPolicy: false,
+    } as const;
+  }
+
+  const supabaseUrl =
+    process.env.SUPABASE_URL ?? process.env.EXPO_PUBLIC_SUPABASE_URL ?? "";
+  let supabaseOrigin = "";
+  try {
+    supabaseOrigin = supabaseUrl ? new URL(supabaseUrl).origin : "";
+  } catch {
+    supabaseOrigin = "";
+  }
+
+  const connectSrc = ["'self'", "https://*.supabase.co"];
+  if (supabaseOrigin) {
+    connectSrc.push(supabaseOrigin);
+  }
+
+  return {
+    crossOriginEmbedderPolicy: false,
+    contentSecurityPolicy: {
+      useDefaults: true,
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: [
+          "'self'",
+          "data:",
+          "blob:",
+          "https://*.supabase.co",
+          "https://*.basemaps.cartocdn.com",
+          "https://*.tile.openstreetmap.org",
+        ],
+        connectSrc,
+        fontSrc: ["'self'", "data:"],
+        objectSrc: ["'none'"],
+        frameAncestors: ["'none'"],
+      },
+    },
+  } as const;
+}
+
+const allowedOrigins = getAllowedCorsOrigins();
+app.use(
+  cors({
+    origin(origin, callback) {
+      if (!origin || allowedOrigins.has(origin)) {
+        callback(null, true);
+        return;
+      }
+      callback(null, false);
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "X-Request-Id",
+      "X-Metrics-Key",
+    ],
+    exposedHeaders: ["X-Request-Id"],
+    maxAge: 60 * 10,
+  }),
+);
+
+app.use(helmet(getHelmetConfig()));
+
+const isProduction = process.env.NODE_ENV === "production";
+const apiLimiter = rateLimit({
+  windowMs: parseNumericEnv(
+    process.env.API_RATE_LIMIT_WINDOW_MS,
+    15 * 60 * 1000,
+  ),
+  limit: parseNumericEnv(process.env.API_RATE_LIMIT_MAX, isProduction ? 120 : 500),
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  skip: (req) => !req.path.startsWith("/api"),
+});
+app.use(apiLimiter);
+
+const logAllHttpRequests = parseBooleanEnv(
+  process.env.LOG_ALL_HTTP_REQUESTS,
+  isProduction,
+);
+const includeHttpUserAgent = parseBooleanEnv(
+  process.env.LOG_INCLUDE_HTTP_USER_AGENT,
+  false,
+);
+const slowRequestThresholdMs = parseNumericEnv(
+  process.env.LOG_SLOW_REQUEST_MS,
+  1000,
+);
+
+app.use((req, res, next) => {
+  const requestId = req.header("x-request-id")?.trim() || randomUUID();
+  req.requestId = requestId;
+  res.setHeader("x-request-id", requestId);
+  next();
+});
 
 app.use(
   express.json({
@@ -24,27 +194,62 @@ app.use(
 
 app.use(express.urlencoded({ extended: false }));
 
-export function log(message: string, source = "express") {
-  const formattedTime = new Date().toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: true,
-  });
+function isMetricsRequestAuthorized(req: Request) {
+  const expectedKey = process.env.METRICS_API_KEY?.trim();
+  if (!expectedKey) {
+    return process.env.NODE_ENV !== "production";
+  }
 
-  console.log(`${formattedTime} [${source}] ${message}`);
+  return req.header("x-metrics-key") === expectedKey;
 }
+
+app.get("/api/metrics", (req, res) => {
+  if (!isMetricsRequestAuthorized(req)) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+
+  return res.json(getMetricsSnapshot());
+});
 
 app.use((req, res, next) => {
   const start = Date.now();
-  const path = req.path;
 
   res.on("finish", () => {
     const duration = Date.now() - start;
-    if (path.startsWith("/api")) {
-      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
+    const route = req.route?.path
+      ? `${req.baseUrl}${String(req.route.path)}`
+      : req.path;
+    recordHttpMetric({
+      method: req.method,
+      route,
+      statusCode: res.statusCode,
+      latencyMs: duration,
+    });
 
-      log(logLine);
+    if (req.path.startsWith("/api")) {
+      const shouldLog =
+        logAllHttpRequests ||
+        res.statusCode >= 400 ||
+        duration >= slowRequestThresholdMs;
+      if (!shouldLog) {
+        return;
+      }
+
+      const level =
+        res.statusCode >= 500 ? "error" : res.statusCode >= 400 ? "warn" : "info";
+      logEvent(level, "http_request", {
+        requestId: req.requestId,
+        method: req.method,
+        path: req.path,
+        route,
+        statusCode: res.statusCode,
+        latencyMs: duration,
+        ip: req.ip,
+        ...(includeHttpUserAgent
+          ? { userAgent: req.get("user-agent") ?? "" }
+          : {}),
+        slow: duration >= slowRequestThresholdMs,
+      });
     }
   });
 
@@ -58,8 +263,12 @@ app.use((req, res, next) => {
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
-
-    console.error("Internal Server Error:", err);
+    trackError(err, {
+      requestId: _req.requestId,
+      path: _req.path,
+      method: _req.method,
+      status,
+    });
 
     if (res.headersSent) {
       return next(err);
@@ -89,7 +298,10 @@ app.use((req, res, next) => {
       host: "0.0.0.0",
     },
     () => {
-      log(`serving on port ${port}`);
+      logEvent("info", "server_started", {
+        port,
+        environment: process.env.NODE_ENV ?? "development",
+      });
     },
   );
 })();

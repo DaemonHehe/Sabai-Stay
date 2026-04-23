@@ -1,8 +1,9 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { Switch, Route } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
+import { toast } from "@/hooks/use-toast";
 
 const Home = lazy(() => import("@/pages/home"));
 const ListView = lazy(() => import("@/pages/list-view"));
@@ -36,9 +37,30 @@ function Router() {
   );
 }
 
+function SessionExpiryNotifier() {
+  useEffect(() => {
+    const handler = () => {
+      queryClient.clear();
+      toast({
+        title: "Session expired",
+        description: "Please sign in again to continue.",
+        variant: "destructive",
+      });
+    };
+
+    window.addEventListener("sabai:session-expired", handler);
+    return () => {
+      window.removeEventListener("sabai:session-expired", handler);
+    };
+  }, []);
+
+  return null;
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
+      <SessionExpiryNotifier />
       <Toaster />
       <Router />
     </QueryClientProvider>

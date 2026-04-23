@@ -46,12 +46,27 @@ export const queryClient = new QueryClient({
     queries: {
       queryFn: getQueryFn({ on401: "throw" }),
       refetchInterval: false,
-      refetchOnWindowFocus: false,
-      staleTime: Infinity,
-      retry: false,
+      refetchOnWindowFocus: true,
+      staleTime: 1000 * 60 * 5,
+      retry: 1,
     },
     mutations: {
       retry: false,
     },
   },
+});
+
+queryClient.setQueryDefaults(["dashboard"], {
+  staleTime: 1000 * 30,
+  refetchOnWindowFocus: true,
+});
+
+queryClient.setQueryDefaults(["bookings"], {
+  staleTime: 1000 * 30,
+  refetchOnWindowFocus: true,
+});
+
+queryClient.setQueryDefaults(["notifications"], {
+  staleTime: 1000 * 15,
+  refetchOnWindowFocus: true,
 });

@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1700" height="1100" viewBox="0 0 1700 1100" role="img" aria-labelledby="title desc">
-  <title id="title">SabaiStay Use Case Diagram</title>
-  <desc id="desc">Use case diagram showing the main SabaiStay actors and the system capabilities available to public visitors, students, owners, and administrators.</desc>
+  <title id="title">Sabai Stay Use Case Diagram</title>
+  <desc id="desc">Use case diagram showing the main Sabai Stay actors and the system capabilities available to public visitors, students, owners, and administrators.</desc>
   <defs>
     <style>
       .bg { fill: #f8fafc; }
@@ -23,11 +23,11 @@
   </defs>
 
   <rect class="bg" x="0" y="0" width="1700" height="1100" />
-  <text class="title" x="40" y="56">SabaiStay Use Case Diagram</text>
+  <text class="title" x="40" y="56">Sabai Stay Use Case Diagram</text>
   <text class="subtitle" x="40" y="86">Main platform interactions grouped by role and aligned with the implemented routes and screens.</text>
 
   <rect class="system" x="300" y="120" width="1100" height="830" />
-  <text class="system-label" x="340" y="164">SabaiStay Platform</text>
+  <text class="system-label" x="340" y="164">Sabai Stay Platform</text>
 
   <g transform="translate(70 220)">
     <circle class="stick" cx="40" cy="26" r="18" />
@@ -141,5 +141,6 @@
 
   <rect class="note" x="300" y="980" width="1100" height="84" />
   <text class="note-text" x="330" y="1012">This diagram is intentionally role-based rather than route-based. The public visitor covers discovery features, the student covers booking and roommate workflows, the owner covers listing and booking management, and the admin covers governance workflows.</text>
-  <text class="note-text" x="330" y="1038">Suggested caption: "Use case diagram of SabaiStay showing interactions among public visitors, students, owners, and administrators."</text>
+  <text class="note-text" x="330" y="1038">Suggested caption: "Use case diagram of Sabai Stay showing interactions among public visitors, students, owners, and administrators."</text>
 </svg>
+

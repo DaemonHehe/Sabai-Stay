@@ -1,16 +1,16 @@
-# SabaiStay
+# Sabai Stay
 
-SabaiStay is a university-focused student housing platform for discovering,
+Sabai Stay is a university-focused student housing platform for discovering,
 evaluating, and managing off-campus accommodation. The app combines
 campus-aware search, utility transparency, booking workflows, contracts,
-roommate matching, reviews, notifications, and owner/admin operations in a
+roommate matching, reviews, notifications, and owner/student operations in a
 single web application.
 
-![SabaiStay UI Overview](./docs/diagrams/ui-overview.png)
+![Sabai Stay UI Overview](./docs/diagrams/ui-overview.png)
 
 ## Overview
 
-This repository contains the current implementation of SabaiStay as a:
+This repository contains the current implementation of Sabai Stay as a:
 
 - React 19 + Vite single-page application
 - TypeScript + Express API server
@@ -42,9 +42,8 @@ generic booking template:
   Link bookings to contract records and contract document metadata.
 - `Roommate matching`
   Store preferences, compute compatibility, and support student messaging.
-- `Owner and admin workflows`
-  Manage listings, respond to reviews, process verification queues, and resolve
-  disputes.
+- `Owner workflows`
+  Manage listings, respond to reviews, and process booking/contract actions.
 - `Supabase-backed persistence`
   Persist app data in PostgreSQL with row-level security and auth profile sync
   triggers.
@@ -56,7 +55,7 @@ Current routes:
 - `/` map-first home page
 - `/list` filterable listing search
 - `/listing/:id` listing details, utilities, reviews, booking flow
-- `/dashboard` role-based owner, student, and admin dashboard
+- `/dashboard` role-based owner and student dashboard
 
 Additional project diagrams and paper-ready assets are available in
 [`docs/diagrams`](./docs/diagrams/README.md).
@@ -130,15 +129,20 @@ Required:
 
 Optional:
 
-- `ADMIN_API_KEY`
 - `ALLOW_MEMORY_FALLBACK`
 - `SUPABASE_ANON_KEY`
+- `CORS_ALLOWED_ORIGINS`
+- `APP_BASE_URL`
+- `API_RATE_LIMIT_WINDOW_MS`
+- `API_RATE_LIMIT_MAX`
+- `METRICS_API_KEY`
+- `LISTING_IMAGES_BUCKET`
+- `CONTRACT_DOCUMENTS_BUCKET`
 
 Environment template:
 
 ```env
 PORT=5000
-ADMIN_API_KEY=
 SUPABASE_URL=https://your-project-ref.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=
 VITE_SUPABASE_URL=https://your-project-ref.supabase.co
@@ -149,6 +153,7 @@ ALLOW_MEMORY_FALLBACK=true
 ### 3. Apply the database schema
 
 Run [`schema.sql`](./schema.sql) in the Supabase SQL editor.
+For larger datasets, also run [`script/add-performance-indexes.sql`](./script/add-performance-indexes.sql).
 
 Detailed setup instructions:
 
@@ -228,8 +233,8 @@ The repository currently implements the major flows required for a university
 housing platform, but there are still product boundaries to be aware of:
 
 - no integrated payment gateway
-- no end-to-end signed document pipeline for contracts
-- no automated unit/integration test suite yet
+- signed upload pipeline for listing images and contract documents is in place
+- automated test suite and CI are now included as a baseline
 - notifications are in-app records, not external email/push delivery
 
 ## Validation
@@ -238,9 +243,11 @@ The main local validation commands are:
 
 ```bash
 npm run check
+npm test
 npm run build
 ```
 
 ## License
 
 This repository currently declares the `MIT` license in `package.json`.
+

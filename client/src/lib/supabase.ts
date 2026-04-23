@@ -36,7 +36,7 @@ type UniversityRow = {
 
 type AppUserRow = {
   id: string;
-  role: "student" | "owner" | "admin";
+  role: "student" | "owner";
   full_name: string | null;
   phone: string | null;
   avatar_url: string | null;
