@@ -1,9 +1,6 @@
 {
   "buildCommand": "npm run build",
   "outputDirectory": "dist/public",
-  "functions": {
-    "api/[...route].ts": {}
-  },
   "rewrites": [
     {
       "source": "/api/:path*",
