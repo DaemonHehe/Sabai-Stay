@@ -123,8 +123,7 @@ export default function ListingDetails() {
       queryClient.invalidateQueries({ queryKey: ["bookings"] });
       toast({
         title: "Booking request submitted",
-        description:
-          "The request now enters the owner approval and deposit workflow.",
+        description: "Your request was sent to the owner.",
       });
       setIsBookingOpen(false);
       setBookingData({
@@ -156,7 +155,7 @@ export default function ListingDetails() {
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       toast({
         title: "Review submitted",
-        description: "Reviews and owner responses are now part of the listing trust flow.",
+        description: "Thanks for sharing your experience.",
       });
       setReviewData((current) => ({ ...current, comment: "", rating: 5 }));
     },
@@ -287,9 +286,10 @@ export default function ListingDetails() {
                   <CircleAlert className="h-5 w-5 text-primary" />
                 </div>
                 <div>
-                  <p className="font-display font-bold">Transparent Listing Data</p>
+                  <p className="font-display font-bold">Listing Details</p>
                   <p className="text-sm opacity-60">
-                    This listing now exposes utility rates, lease options, campus-zone proximity, and transport routes instead of fabricated details.
+                    Utility rates, lease options, campus distance, and transport
+                    routes are shown for this property.
                   </p>
                 </div>
               </div>
@@ -549,7 +549,7 @@ export default function ListingDetails() {
                   ) : null}
 
                   <p className="mt-4 text-center text-xs opacity-40 font-mono">
-                    Workflow: Request → Approval → Deposit → Confirmed
+                    Request / Approval / Deposit / Confirmed
                   </p>
                 </div>
 
@@ -631,7 +631,7 @@ export default function ListingDetails() {
               Booking Request
             </p>
             <p className="mt-2 text-sm opacity-60">
-              Your request starts the approval, deposit, and contract workflow.
+              Send your request and the owner will review it.
             </p>
           </div>
           <Input

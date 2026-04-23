@@ -40,7 +40,6 @@ function Router() {
 function SessionExpiryNotifier() {
   useEffect(() => {
     const handler = () => {
-      queryClient.clear();
       toast({
         title: "Session expired",
         description: "Please sign in again to continue.",

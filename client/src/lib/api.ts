@@ -39,11 +39,19 @@ import {
 import { getSupabaseAccessToken } from "@/lib/supabase";
 
 const API_BASE = "/api";
+const SESSION_EXPIRED_EVENT_COOLDOWN_MS = 5000;
+let lastSessionExpiredEventAt = 0;
 
 function dispatchSessionExpiredEvent() {
-  if (typeof window !== "undefined") {
-    window.dispatchEvent(new CustomEvent("sabai:session-expired"));
+  if (typeof window === "undefined") return;
+
+  const now = Date.now();
+  if (now - lastSessionExpiredEventAt < SESSION_EXPIRED_EVENT_COOLDOWN_MS) {
+    return;
   }
+
+  lastSessionExpiredEventAt = now;
+  window.dispatchEvent(new CustomEvent("sabai:session-expired"));
 }
 
 async function parseResponse<T>(response: Response, fallbackMessage: string): Promise<T> {

@@ -58,7 +58,8 @@ export const queryClient = new QueryClient({
 
 queryClient.setQueryDefaults(["dashboard"], {
   staleTime: 1000 * 30,
-  refetchOnWindowFocus: true,
+  refetchOnWindowFocus: false,
+  retry: false,
 });
 
 queryClient.setQueryDefaults(["bookings"], {

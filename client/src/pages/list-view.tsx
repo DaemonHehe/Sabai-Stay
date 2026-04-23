@@ -81,17 +81,17 @@ export default function ListView() {
             <div className="flex items-center gap-3 mb-4">
               <div className="w-1 h-8 bg-primary" />
               <span className="font-mono text-xs text-primary uppercase tracking-widest">
-                Student Housing Discovery
+                Student Housing
               </span>
             </div>
             <h1 className="text-4xl md:text-6xl lg:text-7xl font-display font-bold uppercase tracking-tighter mb-4 leading-[0.95]">
               Search
               <br />
-              <span className="text-primary">By Campus Logic</span>
+              <span className="text-primary">Near Campus</span>
             </h1>
             <p className="text-base md:text-lg opacity-50 font-light max-w-2xl leading-relaxed">
               Filter by campus zone, room type, walking time, capacity, and monthly
-              budget so the results match the housing decisions students actually make.
+              budget to find rooms that fit your needs.
             </p>
           </div>
         </div>
@@ -255,7 +255,7 @@ export default function ListView() {
             </div>
             <h3 className="text-xl font-display font-bold mb-2">No rooms found</h3>
             <p className="opacity-50">
-              Relax the campus or budget filters to broaden the discovery set.
+              Try widening your campus or budget filters.
             </p>
           </div>
         ) : null}

@@ -683,8 +683,8 @@ begin
   )
   values
     ('rsu-main-gate', rsu_university_id, 'Main Gate', 'Primary arrival point with strongest food and transport access.', 13.9649000, 100.5878000, 300),
-    ('rsu-library', rsu_university_id, 'Central Library', 'Quiet academic zone used by students comparing commute time.', 13.9666000, 100.5904000, 220),
-    ('rsu-engineering', rsu_university_id, 'Engineering Faculty', 'North-east academic cluster with regular shuttle demand.', 13.9692000, 100.5926000, 240),
+    ('rsu-library', rsu_university_id, 'Central Library', 'Library area with quieter surroundings.', 13.9666000, 100.5904000, 220),
+    ('rsu-engineering', rsu_university_id, 'Engineering Faculty', 'Engineering side of campus with regular shuttle traffic.', 13.9692000, 100.5926000, 240),
     ('rsu-design', rsu_university_id, 'Design And Media', 'Creative cluster used by loft and studio residents.', 13.9624000, 100.5861000, 200)
   on conflict (id) do update
     set university_id = excluded.university_id,

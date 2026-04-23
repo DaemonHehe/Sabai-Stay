@@ -6,6 +6,8 @@ coverage/
 .turbo/
 .vite/
 .local/
+playwright-report/
+test-results/
 
 # env
 .env

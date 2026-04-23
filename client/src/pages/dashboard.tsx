@@ -32,7 +32,8 @@ type OwnerListingSort = "recent" | "price_high" | "price_low";
 
 export default function Dashboard() {
   const { toast } = useToast();
-  const { profile } = useAuth();
+  const { profile, isLoading: isAuthLoading } = useAuth();
+  const canLoadDashboard = Boolean(profile?.appUser.id) && !isAuthLoading;
 
   const {
     data: dashboard,
@@ -41,6 +42,10 @@ export default function Dashboard() {
   } = useQuery({
     queryKey: ["dashboard"],
     queryFn: api.getDashboard,
+    enabled: canLoadDashboard,
+    retry: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 
   const {
@@ -194,7 +199,7 @@ export default function Dashboard() {
         gallery = [upload.assetUrl];
       }
 
-      return api.createListing({
+        return api.createListing({
         ownerUserId: profile?.appUser.id ?? "",
         universityId: activeUniversityId,
         title: listingForm.title,
@@ -206,7 +211,7 @@ export default function Dashboard() {
         image: imageUrl,
         gallery,
         description:
-          "New owner-submitted listing with utilities, contract workflow, and campus-aware commute data.",
+          "Owner-submitted listing with utility rates, lease options, and commute details.",
         latitude: "13.9650",
         longitude: "100.5900",
         areaSqm: 28,
@@ -240,7 +245,7 @@ export default function Dashboard() {
       queryClient.invalidateQueries({ queryKey: ["listings"] });
       toast({
         title: "Listing submitted",
-        description: "The owner workflow now includes moderation-ready draft creation.",
+        description: "Draft saved and sent for review.",
       });
       setListingForm({
         title: "",
@@ -331,8 +336,8 @@ export default function Dashboard() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       toast({
-        title: "Booking workflow updated",
-        description: "Request, approval, deposit, and confirmation states are live.",
+        title: "Booking status updated",
+        description: "The booking status was saved.",
       });
     },
   });
@@ -355,7 +360,7 @@ export default function Dashboard() {
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       toast({
         title: "Roommate profile saved",
-        description: "Matching preferences and compatibility inputs are updated.",
+        description: "Your preferences were updated.",
       });
     },
   });
@@ -372,7 +377,7 @@ export default function Dashboard() {
       setMessageDraft("");
       toast({
         title: "Message sent",
-        description: "Student-to-student roommate messaging is active.",
+        description: "Your message was sent.",
       });
     },
   });
@@ -525,12 +530,29 @@ export default function Dashboard() {
     ownerListingSort,
   ]);
 
+  if (!isAuthLoading && !profile?.appUser.id) {
+    return (
+      <Layout>
+        <div className="container mx-auto px-4 md:px-6 py-16">
+          <Card>
+            <p className="font-display text-2xl font-bold uppercase">
+              Dashboard Unavailable
+            </p>
+            <p className="mt-3 text-sm opacity-70">
+              Your session is not active. Sign in as Student or Owner to open the
+              dashboard.
+            </p>
+          </Card>
+        </div>
+      </Layout>
+    );
+  }
+
   if (dashboardError) {
     const message =
       dashboardError instanceof Error
         ? dashboardError.message
-        : "Sign in with a valid account and make sure the Supabase schema is applied before using owner and student workflows.";
-    const isAuthError = message.toLowerCase().includes("authentication");
+        : "Sign in with a valid account and confirm the database schema is applied.";
     const isForbiddenError = message.toLowerCase().includes("forbidden");
 
     return (
@@ -541,9 +563,7 @@ export default function Dashboard() {
               Dashboard Unavailable
             </p>
             <p className="mt-3 text-sm opacity-70">
-              {isAuthError
-                ? "Your session is not active. Sign in as a Student or Owner to access dashboard workflows."
-                : isForbiddenError
+              {isForbiddenError
                   ? "Your account does not have permission for this dashboard action."
                   : message}
             </p>
@@ -571,7 +591,7 @@ export default function Dashboard() {
     );
   }
 
-  if (isLoading || !dashboard || !discovery) {
+  if (isAuthLoading || isLoading || !dashboard || !discovery) {
     return (
       <Layout>
         <div className="container mx-auto px-4 md:px-6 py-16">
@@ -651,8 +671,8 @@ export default function Dashboard() {
               Owner Workspace Locked
             </p>
             <p className="mt-2 text-sm opacity-70">
-              Listing creation, booking triage, and moderation controls are available
-              for Owner accounts only.
+              Listing creation and booking management are available for Owner
+              accounts only.
             </p>
           </Card>
         ) : null}
@@ -660,9 +680,9 @@ export default function Dashboard() {
         {canManageListings ? (
           <section>
             <SectionTitle
-              kicker="Owner Workflow"
-              title="Inventory, Approvals, And Analytics"
-              description="Landlords can triage incoming requests, move bookings through deposit checkpoints, and manage listing lifecycle in one view."
+              kicker="Owner Operations"
+              title="Listings, Requests, And Analytics"
+              description="Manage listings, handle booking requests, and track performance in one place."
             />
             <div className="grid gap-6 xl:grid-cols-[1fr_1.5fr]">
               <div className="space-y-4">
@@ -1383,8 +1403,8 @@ export default function Dashboard() {
         <section>
           <SectionTitle
             kicker="Notifications"
-            title="Alerts And Workflow Updates"
-            description="Booking changes, contract milestones, and roommate activity now generate notification records."
+            title="Recent Alerts"
+            description="Booking updates, contract changes, and roommate activity appear here."
           />
           <div className="grid gap-4">
             {dashboard.notifications.map((notification) => (

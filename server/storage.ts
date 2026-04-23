@@ -357,7 +357,7 @@ export class MemoryStorage implements IStorage {
         id: "rsu-library",
         universityId: "rsu",
         name: "Central Library",
-        description: "Quiet academic zone used by students comparing commute time.",
+        description: "Library area with quieter surroundings.",
         latitude: 13.9666,
         longitude: 100.5904,
         walkingRadiusMeters: 220,
@@ -366,7 +366,7 @@ export class MemoryStorage implements IStorage {
         id: "rsu-engineering",
         universityId: "rsu",
         name: "Engineering Faculty",
-        description: "North-east academic cluster with regular shuttle demand.",
+        description: "Engineering side of campus with regular shuttle traffic.",
         latitude: 13.9692,
         longitude: 100.5926,
         walkingRadiusMeters: 240,
@@ -995,13 +995,13 @@ export class MemoryStorage implements IStorage {
     );
 
     if (status === "deposit_pending" || status === "confirmed") {
-      this.addNotification(
-        "contract",
-        "owner",
-        "Contract workflow updated",
-        `Contract package for ${nextBooking.guestName} is now ${status}.`,
-        nextBooking.ownerUserId,
-      );
+        this.addNotification(
+          "contract",
+          "owner",
+          "Contract status updated",
+          `Contract package for ${nextBooking.guestName} is now ${status}.`,
+          nextBooking.ownerUserId,
+        );
     }
 
     return nextBooking;
@@ -2047,7 +2047,7 @@ class SupabaseStorage implements IStorage {
       await this.createNotification({
         type: "contract",
         userRole: "owner",
-        title: "Contract workflow updated",
+        title: "Contract status updated",
         body: `Contract package for ${data.guest_name} is now ${status}.`,
         userId: data.owner_user_id,
       });
