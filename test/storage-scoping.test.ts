@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { MemoryStorage } from "../server/storage";
+import { MemoryStorage, StorageError } from "../server/storage";
 
 test("bookings and contracts are scoped by user id", async () => {
   const storage = new MemoryStorage();
@@ -94,4 +94,31 @@ test("dashboard payload is user-scoped and contains no admin-only queues", async
   assert.equal(studentDashboard.ownerListings.length, 0);
   assert.equal(studentDashboard.verificationTasks.length, 0);
   assert.equal(studentDashboard.disputes.length, 0);
+});
+
+test("booking status updates enforce the defined workflow", async () => {
+  const storage = new MemoryStorage();
+  const [booking] = await storage.getBookings("owner-sabai-living");
+  assert.ok(booking);
+  assert.equal(booking.status, "requested");
+
+  await assert.rejects(
+    () => storage.updateBookingStatus(booking.id, "confirmed"),
+    (error) =>
+      error instanceof StorageError &&
+      error.code === "INVALID_BOOKING_TRANSITION",
+  );
+
+  const approved = await storage.updateBookingStatus(booking.id, "approved");
+  assert.equal(approved?.status, "approved");
+
+  const depositPending = await storage.updateBookingStatus(
+    booking.id,
+    "deposit_pending",
+  );
+  assert.equal(depositPending?.status, "deposit_pending");
+
+  const confirmed = await storage.updateBookingStatus(booking.id, "confirmed");
+  assert.equal(confirmed?.status, "confirmed");
+  assert.equal(confirmed?.depositPaid, true);
 });

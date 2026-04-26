@@ -62,6 +62,31 @@ function createTimelineEvent(status: BookingStatus, label: string) {
   };
 }
 
+const validBookingTransitions: Record<BookingStatus, BookingStatus[]> = {
+  requested: ["approved", "rejected"],
+  approved: ["deposit_pending", "rejected"],
+  deposit_pending: ["confirmed", "rejected"],
+  confirmed: ["cancelled"],
+  rejected: [],
+  cancelled: [],
+};
+
+function assertValidBookingTransition(
+  currentStatus: BookingStatus,
+  nextStatus: BookingStatus,
+) {
+  if (currentStatus === nextStatus) {
+    return;
+  }
+
+  if (!validBookingTransitions[currentStatus].includes(nextStatus)) {
+    throw new StorageError(
+      `Invalid booking status transition from ${currentStatus} to ${nextStatus}`,
+      "INVALID_BOOKING_TRANSITION",
+    );
+  }
+}
+
 function monthDiff(start: Date, end: Date) {
   const days = Math.max(
     1,
@@ -974,6 +999,7 @@ export class MemoryStorage implements IStorage {
     }
 
     const current = this.bookings[index];
+    assertValidBookingTransition(current.status, status);
     const nextBooking = bookingSchema.parse({
       ...current,
       status,
@@ -2013,6 +2039,10 @@ class SupabaseStorage implements IStorage {
   }
 
   async updateBookingStatus(id: string, status: BookingStatus): Promise<Booking | undefined> {
+    const current = await this.getBookingById(id);
+    if (!current) return undefined;
+    assertValidBookingTransition(current.status, status);
+
     const { data, error } = await this.supabase
       .from("bookings")
       .update({ status, deposit_paid: status === "confirmed" ? true : undefined })

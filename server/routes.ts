@@ -274,6 +274,12 @@ export async function registerRoutes(
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: formatZodError(error) });
       }
+      if (
+        error instanceof StorageError &&
+        error.code === "INVALID_BOOKING_TRANSITION"
+      ) {
+        return res.status(409).json({ error: error.message });
+      }
       console.error("Error updating booking status:", error);
       res.status(500).json({ error: "Failed to update booking status" });
     }
