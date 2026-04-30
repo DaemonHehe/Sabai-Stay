@@ -11,6 +11,33 @@ const ThemeToggle = lazy(() =>
     default: module.ThemeToggle,
   })),
 );
+
+const footerSections = [
+  {
+    title: "Explore",
+    links: [
+      { label: "All Rooms", href: "/list" },
+      { label: "Map View", href: "/" },
+      { label: "Near RSU", href: "/list?q=RSU" },
+    ],
+  },
+  {
+    title: "Support",
+    links: [
+      { label: "Help Center", href: "/help" },
+      { label: "Contact", href: "/contact" },
+      { label: "FAQ", href: "/faq" },
+    ],
+  },
+  {
+    title: "Legal",
+    links: [
+      { label: "Privacy", href: "/privacy" },
+      { label: "Terms", href: "/terms" },
+    ],
+  },
+];
+
 function HeaderControlFallback({
   label,
 }: {
@@ -131,9 +158,12 @@ export function Layout({
 
           <div className="flex items-center gap-2">
             <button
+              type="button"
               onClick={() => setSearchOpen(!searchOpen)}
               className="h-10 w-10 rounded-full bg-secondary/50 border flex items-center justify-center hover:bg-secondary transition-colors"
               style={{ borderColor: "var(--color-border)" }}
+              aria-label={searchOpen ? "Close search" : "Open search"}
+              aria-expanded={searchOpen}
             >
               {searchOpen ? (
                 <X className="h-4 w-4" />
@@ -309,53 +339,24 @@ export function Layout({
                 </p>
               </div>
 
-              <div className="space-y-4">
-                <h4 className="font-mono text-xs text-primary uppercase tracking-wider">
-                  Explore
-                </h4>
-                <ul className="space-y-2 text-sm opacity-50">
-                  <li className="hover:opacity-100 cursor-pointer transition-opacity">
-                    All Rooms
-                  </li>
-                  <li className="hover:opacity-100 cursor-pointer transition-opacity">
-                    Map View
-                  </li>
-                  <li className="hover:opacity-100 cursor-pointer transition-opacity">
-                    Near RSU
-                  </li>
-                </ul>
-              </div>
-
-              <div className="space-y-4">
-                <h4 className="font-mono text-xs text-primary uppercase tracking-wider">
-                  Support
-                </h4>
-                <ul className="space-y-2 text-sm opacity-50">
-                  <li className="hover:opacity-100 cursor-pointer transition-opacity">
-                    Help Center
-                  </li>
-                  <li className="hover:opacity-100 cursor-pointer transition-opacity">
-                    Contact
-                  </li>
-                  <li className="hover:opacity-100 cursor-pointer transition-opacity">
-                    FAQ
-                  </li>
-                </ul>
-              </div>
-
-              <div className="space-y-4">
-                <h4 className="font-mono text-xs text-primary uppercase tracking-wider">
-                  Legal
-                </h4>
-                <ul className="space-y-2 text-sm opacity-50">
-                  <li className="hover:opacity-100 cursor-pointer transition-opacity">
-                    Privacy
-                  </li>
-                  <li className="hover:opacity-100 cursor-pointer transition-opacity">
-                    Terms
-                  </li>
-                </ul>
-              </div>
+              {footerSections.map((section) => (
+                <div key={section.title} className="space-y-4">
+                  <h4 className="font-mono text-xs text-primary uppercase tracking-wider">
+                    {section.title}
+                  </h4>
+                  <ul className="space-y-2 text-sm opacity-60">
+                    {section.links.map((link) => (
+                      <li key={link.href}>
+                        <Link href={link.href}>
+                          <span className="inline-flex cursor-pointer transition-opacity hover:opacity-100">
+                            {link.label}
+                          </span>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
             </div>
             <div
               className="mt-12 pt-6 border-t flex flex-col sm:flex-row justify-between items-center gap-4 text-xs opacity-30 font-mono"

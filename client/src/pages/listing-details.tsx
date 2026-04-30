@@ -18,6 +18,8 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/contexts/auth-context";
 import NotFound from "./not-found";
+import { ErrorState, getErrorMessage } from "@/components/error-state";
+import { ListingDetailsSkeleton } from "@/components/page-skeletons";
 
 function BookingModal({
   open,
@@ -91,12 +93,22 @@ export default function ListingDetails() {
   });
   const [ownerResponseDraft, setOwnerResponseDraft] = useState<Record<string, string>>({});
 
-  const { data: listing, isLoading } = useQuery({
+  const {
+    data: listing,
+    isLoading,
+    error: listingError,
+    refetch: refetchListing,
+  } = useQuery({
     queryKey: ["listing", params?.id],
     queryFn: () => api.getListing(params!.id),
     enabled: Boolean(params?.id),
+    retry: false,
   });
-  const { data: discovery } = useQuery({
+  const {
+    data: discovery,
+    error: discoveryError,
+    refetch: refetchDiscovery,
+  } = useQuery({
     queryKey: ["discovery"],
     queryFn: api.getDiscovery,
   });
@@ -139,10 +151,10 @@ export default function ListingDetails() {
     onError: (error) => {
       toast({
         title: "Unable to submit booking",
-        description:
-          error instanceof Error
-            ? error.message
-            : "Please check your booking details and try again.",
+        description: getErrorMessage(
+          error,
+          "Please check your booking details and try again.",
+        ),
         variant: "destructive",
       });
     },
@@ -159,6 +171,13 @@ export default function ListingDetails() {
       });
       setReviewData((current) => ({ ...current, comment: "", rating: 5 }));
     },
+    onError: (error) => {
+      toast({
+        title: "Unable to submit review",
+        description: getErrorMessage(error, "Review submission failed."),
+        variant: "destructive",
+      });
+    },
   });
 
   const reviewResponseMutation = useMutation({
@@ -169,6 +188,13 @@ export default function ListingDetails() {
       toast({
         title: "Owner response saved",
         description: "The review thread now includes the landlord reply.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Unable to save response",
+        description: getErrorMessage(error, "Owner response failed."),
+        variant: "destructive",
       });
     },
   });
@@ -207,13 +233,35 @@ export default function ListingDetails() {
   if (isLoading) {
     return (
       <Layout>
-        <div className="min-h-screen flex items-center justify-center">
-          <div className="flex items-center gap-3">
-            <div className="w-2 h-2 bg-primary rounded-full animate-bounce [animation-delay:-0.3s]" />
-            <div className="w-2 h-2 bg-primary rounded-full animate-bounce [animation-delay:-0.15s]" />
-            <div className="w-2 h-2 bg-primary rounded-full animate-bounce" />
-          </div>
-        </div>
+        <ListingDetailsSkeleton />
+      </Layout>
+    );
+  }
+
+  if (listingError || discoveryError) {
+    const message = getErrorMessage(
+      listingError ?? discoveryError,
+      "This listing could not be loaded.",
+    );
+    const isMissing = message.toLowerCase().includes("not found");
+
+    if (isMissing) {
+      return <NotFound />;
+    }
+
+    return (
+      <Layout>
+        <ErrorState
+          code="500"
+          title="Listing unavailable"
+          description={message}
+          onAction={() => {
+            void refetchListing();
+            void refetchDiscovery();
+          }}
+          backHref="/list"
+          backLabel="Back to Listings"
+        />
       </Layout>
     );
   }
@@ -238,6 +286,9 @@ export default function ListingDetails() {
           <img
             src={listing.image}
             alt={listing.title}
+            loading="eager"
+            decoding="async"
+            fetchPriority="high"
             className="w-full h-full object-cover"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent" />

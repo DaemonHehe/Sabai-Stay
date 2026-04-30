@@ -32,4 +32,28 @@ test.describe("Public smoke", () => {
     await page.goto("/dashboard");
     await expect(page.getByText(/dashboard unavailable/i)).toBeVisible();
   });
+
+  test("text inputs keep focus while typing", async ({ page }) => {
+    await page.goto("/list");
+
+    await page.getByRole("button", { name: /open search/i }).click();
+    const searchInput = page.getByPlaceholder(/search condos/i);
+    await searchInput.click();
+
+    for (const char of "condo") {
+      await page.keyboard.type(char);
+      await expect(searchInput).toBeFocused();
+    }
+    await expect(searchInput).toHaveValue("condo");
+
+    await page.getByRole("button", { name: /account/i }).click();
+    const emailInput = page.locator("#sign-in-email");
+    await emailInput.click();
+
+    for (const char of "student@example.com") {
+      await page.keyboard.type(char);
+      await expect(emailInput).toBeFocused();
+    }
+    await expect(emailInput).toHaveValue("student@example.com");
+  });
 });

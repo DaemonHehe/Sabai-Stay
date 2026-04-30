@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { MemoryStorage, StorageError } from "../server/storage";
+import type { InsertListing } from "../shared/schema";
 
 test("bookings and contracts are scoped by user id", async () => {
   const storage = new MemoryStorage();
@@ -94,6 +95,63 @@ test("dashboard payload is user-scoped and contains no admin-only queues", async
   assert.equal(studentDashboard.ownerListings.length, 0);
   assert.equal(studentDashboard.verificationTasks.length, 0);
   assert.equal(studentDashboard.disputes.length, 0);
+});
+
+test("owner listing dashboard workflow creates and updates listings", async () => {
+  const storage = new MemoryStorage();
+  const [template] = await storage.getAllListings();
+  assert.ok(template);
+
+  const draftPayload: InsertListing = {
+    ownerUserId: "owner-sabai-living",
+    universityId: template.universityId,
+    title: "Owner Dashboard Smoke Listing",
+    location: "Muang Ake, Pathum Thani",
+    price: 9200,
+    rating: "0.00",
+    category: "CONDO",
+    roomType: "studio",
+    image: template.image,
+    gallery: template.gallery,
+    description: "Created through the owner dashboard smoke workflow.",
+    latitude: template.latitude,
+    longitude: template.longitude,
+    areaSqm: template.areaSqm,
+    capacity: template.capacity,
+    bedrooms: template.bedrooms,
+    bathrooms: template.bathrooms,
+    featured: false,
+    listingStatus: "draft",
+    moderationStatus: "pending",
+    amenities: template.amenities,
+    nearestCampusZoneId: template.nearestCampusZoneId,
+    walkingMinutes: 8,
+    transportRouteIds: template.transportRouteIds,
+    utilityRates: template.utilityRates,
+    internetIncluded: template.internetIncluded,
+    leaseOptions: template.leaseOptions,
+    availableFrom: new Date("2026-06-01"),
+    availableTo: null,
+  };
+
+  const created = await storage.createListing(draftPayload);
+  assert.equal(created.ownerUserId, "owner-sabai-living");
+  assert.equal(created.listingStatus, "draft");
+
+  const updated = await storage.updateListing(created.id, {
+    listingStatus: "active",
+    price: 9400,
+  });
+  assert.equal(updated?.listingStatus, "active");
+  assert.equal(updated?.price, 9400);
+
+  const ownerDashboard = await storage.getDashboardData(
+    "owner-sabai-living",
+    "owner",
+  );
+  assert.ok(
+    ownerDashboard.ownerListings.some((listing) => listing.id === created.id),
+  );
 });
 
 test("booking status updates enforce the defined workflow", async () => {

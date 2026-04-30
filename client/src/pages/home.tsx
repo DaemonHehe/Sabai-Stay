@@ -4,6 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useSearchParams } from "wouter";
 import { filterListingsByQuery } from "@/lib/listing-search";
+import { ErrorState, getErrorMessage } from "@/components/error-state";
+import { MapSkeleton } from "@/components/page-skeletons";
 
 const MapView = lazy(() =>
   import("@/components/map-view").then((module) => ({
@@ -14,11 +16,19 @@ const MapView = lazy(() =>
 export default function Home() {
   const [searchParams] = useSearchParams();
   const searchQuery = searchParams.get("q") ?? "";
-  const { data: listings = [], isLoading } = useQuery({
+  const {
+    data: listings = [],
+    error: listingsError,
+    refetch: refetchListings,
+  } = useQuery({
     queryKey: ["listings", searchQuery],
     queryFn: () => api.getListings({ q: searchQuery }),
   });
-  const { data: discovery } = useQuery({
+  const {
+    data: discovery,
+    error: discoveryError,
+    refetch: refetchDiscovery,
+  } = useQuery({
     queryKey: ["discovery"],
     queryFn: api.getDiscovery,
   });
@@ -36,17 +46,25 @@ export default function Home() {
   return (
     <Layout noPadding>
       <div className="h-screen w-full relative">
-        <Suspense
-          fallback={
-            <div className="h-full w-full flex items-center justify-center">
-              <div className="flex items-center gap-3">
-                <div className="w-2 h-2 bg-primary rounded-full animate-bounce [animation-delay:-0.3s]" />
-                <div className="w-2 h-2 bg-primary rounded-full animate-bounce [animation-delay:-0.15s]" />
-                <div className="w-2 h-2 bg-primary rounded-full animate-bounce" />
-              </div>
-            </div>
-          }
-        >
+        {listingsError || discoveryError ? (
+          <div className="absolute inset-0 z-[1200] overflow-auto" style={{ backgroundColor: "var(--color-background)" }}>
+            <ErrorState
+              code="500"
+              title="Map data unavailable"
+              description={getErrorMessage(
+                listingsError ?? discoveryError,
+                "Rooms and campus data could not be loaded.",
+              )}
+              onAction={() => {
+                void refetchListings();
+                void refetchDiscovery();
+              }}
+              backHref="/list"
+              backLabel="Open List View"
+            />
+          </div>
+        ) : null}
+        <Suspense fallback={<MapSkeleton />}>
           <MapView searchQuery={searchQuery} />
         </Suspense>
 

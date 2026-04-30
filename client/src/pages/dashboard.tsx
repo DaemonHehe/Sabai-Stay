@@ -8,6 +8,7 @@ import { api } from "@/lib/api";
 import { queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/contexts/auth-context";
 import { useToast } from "@/hooks/use-toast";
+import { DashboardSkeleton } from "@/components/page-skeletons";
 import { Card, SectionTitle } from "@/features/dashboard/dashboard-ui";
 import {
   bookingStatusTransitionMap,
@@ -29,6 +30,22 @@ type OwnerBookingSort = "newest" | "check_in" | "highest_value";
 type OwnerListingFilter = "all" | Listing["listingStatus"];
 type OwnerListingSort = "recent" | "price_high" | "price_low";
 
+const listingImageContentTypes = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+]);
+const contractDocumentContentTypes = new Set([
+  "application/pdf",
+  "image/jpeg",
+  "image/png",
+]);
+const maxListingImageBytes = 8 * 1024 * 1024;
+const maxContractDocumentBytes = 10 * 1024 * 1024;
+
+function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback;
+}
 
 export default function Dashboard() {
   const { toast } = useToast();
@@ -133,6 +150,16 @@ export default function Dashboard() {
       .filter((route) => route.universityId === activeUniversityId)
       .map((route) => route.id) ?? [];
 
+  const listingDraftReady =
+    listingForm.title.trim().length > 0 &&
+    listingForm.location.trim().length > 0 &&
+    Number.isFinite(Number(listingForm.price)) &&
+    Number(listingForm.price) > 0 &&
+    Number.isFinite(Number(listingForm.walkingMinutes)) &&
+    Number(listingForm.walkingMinutes) >= 0 &&
+    Boolean(activeUniversityId) &&
+    Boolean(defaultCampusZoneId);
+
   useEffect(() => {
     const existing =
       viewerRoommateProfile ??
@@ -182,6 +209,19 @@ export default function Dashboard() {
 
   const createListingMutation = useMutation({
     mutationFn: async () => {
+      if (!listingDraftReady) {
+        throw new Error(
+          "Add a title, location, valid rent, walk time, and campus context before submitting.",
+        );
+      }
+
+      if (
+        listingImageFile &&
+        !listingImageContentTypes.has(listingImageFile.type)
+      ) {
+        throw new Error("Listing cover image must be a PNG, JPG, or WEBP file.");
+      }
+
       let imageUrl = "/images/condo-exterior.png";
       let gallery = ["/images/condo-exterior.png"];
 
@@ -199,11 +239,11 @@ export default function Dashboard() {
         gallery = [upload.assetUrl];
       }
 
-        return api.createListing({
+      return api.createListing({
         ownerUserId: profile?.appUser.id ?? "",
         universityId: activeUniversityId,
-        title: listingForm.title,
-        location: listingForm.location,
+        title: listingForm.title.trim(),
+        location: listingForm.location.trim(),
         price: Number(listingForm.price),
         rating: "0.00",
         category: listingForm.category,
@@ -260,10 +300,7 @@ export default function Dashboard() {
     onError: (error) => {
       toast({
         title: "Unable to create listing",
-        description:
-          error instanceof Error
-            ? error.message
-            : "Listing draft creation failed.",
+        description: getErrorMessage(error, "Listing draft creation failed."),
         variant: "destructive",
       });
     },
@@ -277,6 +314,10 @@ export default function Dashboard() {
       contractId: string;
       file: File;
     }) => {
+      if (!contractDocumentContentTypes.has(file.type)) {
+        throw new Error("Contract document must be a PDF, JPG, or PNG file.");
+      }
+
       const upload = await api.createContractDocumentUploadUrl({
         contractId,
         fileName: file.name,
@@ -293,8 +334,12 @@ export default function Dashboard() {
         path: upload.path,
       });
     },
-    onSuccess: () => {
+    onSuccess: (_document, variables) => {
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      setContractUploadFiles((current) => ({
+        ...current,
+        [variables.contractId]: null,
+      }));
       toast({
         title: "Document uploaded",
         description: "Contract document was uploaded and linked successfully.",
@@ -303,10 +348,10 @@ export default function Dashboard() {
     onError: (error) => {
       toast({
         title: "Upload failed",
-        description:
-          error instanceof Error
-            ? error.message
-            : "Unable to upload and register contract document.",
+        description: getErrorMessage(
+          error,
+          "Unable to upload and register contract document.",
+        ),
         variant: "destructive",
       });
     },
@@ -328,6 +373,13 @@ export default function Dashboard() {
         description: "Portfolio status has been refreshed.",
       });
     },
+    onError: (error) => {
+      toast({
+        title: "Unable to update listing",
+        description: getErrorMessage(error, "Listing status update failed."),
+        variant: "destructive",
+      });
+    },
   });
 
   const bookingStatusMutation = useMutation({
@@ -338,6 +390,13 @@ export default function Dashboard() {
       toast({
         title: "Booking status updated",
         description: "The booking status was saved.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Unable to update booking",
+        description: getErrorMessage(error, "Booking status update failed."),
+        variant: "destructive",
       });
     },
   });
@@ -352,6 +411,13 @@ export default function Dashboard() {
         description: "Contract state and document readiness were updated.",
       });
     },
+    onError: (error) => {
+      toast({
+        title: "Unable to update contract",
+        description: getErrorMessage(error, "Contract status update failed."),
+        variant: "destructive",
+      });
+    },
   });
 
   const roommateProfileMutation = useMutation({
@@ -361,6 +427,13 @@ export default function Dashboard() {
       toast({
         title: "Roommate profile saved",
         description: "Your preferences were updated.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Unable to save profile",
+        description: getErrorMessage(error, "Roommate profile update failed."),
+        variant: "destructive",
       });
     },
   });
@@ -380,12 +453,26 @@ export default function Dashboard() {
         description: "Your message was sent.",
       });
     },
+    onError: (error) => {
+      toast({
+        title: "Unable to send message",
+        description: getErrorMessage(error, "Roommate message failed."),
+        variant: "destructive",
+      });
+    },
   });
 
   const notificationMutation = useMutation({
     mutationFn: (id: string) => api.markNotificationRead(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+    },
+    onError: (error) => {
+      toast({
+        title: "Unable to update notification",
+        description: getErrorMessage(error, "Notification update failed."),
+        variant: "destructive",
+      });
     },
   });
 
@@ -594,17 +681,7 @@ export default function Dashboard() {
   if (isAuthLoading || isLoading || !dashboard || !discovery) {
     return (
       <Layout>
-        <div className="container mx-auto px-4 md:px-6 py-16">
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {Array.from({ length: 8 }).map((_, index) => (
-              <Card key={index}>
-                <div className="h-3 w-24 animate-pulse rounded bg-secondary/80" />
-                <div className="mt-4 h-10 w-20 animate-pulse rounded bg-secondary/80" />
-                <div className="mt-2 h-3 w-32 animate-pulse rounded bg-secondary/80" />
-              </Card>
-            ))}
-          </div>
-        </div>
+        <DashboardSkeleton />
       </Layout>
     );
   }
@@ -780,9 +857,35 @@ export default function Dashboard() {
                       <Input
                         type="file"
                         accept="image/png,image/jpeg,image/webp"
-                        onChange={(event) =>
-                          setListingImageFile(event.target.files?.[0] ?? null)
-                        }
+                        onChange={(event) => {
+                          const file = event.target.files?.[0] ?? null;
+                          if (!file) {
+                            setListingImageFile(null);
+                            return;
+                          }
+                          if (!listingImageContentTypes.has(file.type)) {
+                            event.target.value = "";
+                            setListingImageFile(null);
+                            toast({
+                              title: "Unsupported image",
+                              description:
+                                "Choose a PNG, JPG, or WEBP listing cover image.",
+                              variant: "destructive",
+                            });
+                            return;
+                          }
+                          if (file.size > maxListingImageBytes) {
+                            event.target.value = "";
+                            setListingImageFile(null);
+                            toast({
+                              title: "Image too large",
+                              description: "Listing cover images must be 8 MB or less.",
+                              variant: "destructive",
+                            });
+                            return;
+                          }
+                          setListingImageFile(file);
+                        }}
                       />
                       <p className="text-xs opacity-60">
                         {listingImageFile
@@ -794,10 +897,7 @@ export default function Dashboard() {
                       className="w-full"
                       onClick={() => createListingMutation.mutate()}
                       disabled={
-                        !listingForm.title ||
-                        !listingForm.location ||
-                        !activeUniversityId ||
-                        !defaultCampusZoneId ||
+                        !listingDraftReady ||
                         createListingMutation.isPending
                       }
                     >
@@ -1212,12 +1312,46 @@ export default function Dashboard() {
                         <Input
                           type="file"
                           accept="application/pdf,image/png,image/jpeg"
-                          onChange={(event) =>
+                          onChange={(event) => {
+                            const file = event.target.files?.[0] ?? null;
+                            if (!file) {
+                              setContractUploadFiles((current) => ({
+                                ...current,
+                                [contract.id]: null,
+                              }));
+                              return;
+                            }
+                            if (!contractDocumentContentTypes.has(file.type)) {
+                              event.target.value = "";
+                              setContractUploadFiles((current) => ({
+                                ...current,
+                                [contract.id]: null,
+                              }));
+                              toast({
+                                title: "Unsupported document",
+                                description: "Choose a PDF, JPG, or PNG contract file.",
+                                variant: "destructive",
+                              });
+                              return;
+                            }
+                            if (file.size > maxContractDocumentBytes) {
+                              event.target.value = "";
+                              setContractUploadFiles((current) => ({
+                                ...current,
+                                [contract.id]: null,
+                              }));
+                              toast({
+                                title: "Document too large",
+                                description: "Contract documents must be 10 MB or less.",
+                                variant: "destructive",
+                              });
+                              return;
+                            }
                             setContractUploadFiles((current) => ({
                               ...current,
-                              [contract.id]: event.target.files?.[0] ?? null,
-                            }))
-                          }
+                              [contract.id]: file,
+                            }));
+                          }}
                         />
                         <div className="mt-2 flex items-center justify-between gap-3">
                           <p className="text-xs opacity-60">

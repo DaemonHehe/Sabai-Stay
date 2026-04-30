@@ -23,6 +23,9 @@ export function ListingCard({
           <img
             src={listing.image}
             alt={listing.title}
+            loading={featured ? "eager" : "lazy"}
+            decoding="async"
+            fetchPriority={featured ? "high" : "auto"}
             className="h-full w-full object-cover transition-all duration-700 group-hover:scale-110 saturate-[0.9] group-hover:saturate-100"
           />
 

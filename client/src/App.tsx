@@ -4,23 +4,19 @@ import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { toast } from "@/hooks/use-toast";
+import { AppErrorBoundary } from "@/components/app-error-boundary";
+import { RouteSkeleton } from "@/components/page-skeletons";
 
 const Home = lazy(() => import("@/pages/home"));
 const ListView = lazy(() => import("@/pages/list-view"));
 const ListingDetails = lazy(() => import("@/pages/listing-details"));
 const Dashboard = lazy(() => import("@/pages/dashboard"));
+const InfoPage = lazy(() => import("@/pages/info-page"));
+const ServerError = lazy(() => import("@/pages/server-error"));
 const NotFound = lazy(() => import("@/pages/not-found"));
 
 function RouteFallback() {
-  return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="flex items-center gap-3">
-        <div className="w-2 h-2 bg-primary rounded-full animate-bounce [animation-delay:-0.3s]" />
-        <div className="w-2 h-2 bg-primary rounded-full animate-bounce [animation-delay:-0.15s]" />
-        <div className="w-2 h-2 bg-primary rounded-full animate-bounce" />
-      </div>
-    </div>
-  );
+  return <RouteSkeleton />;
 }
 
 function Router() {
@@ -31,6 +27,12 @@ function Router() {
         <Route path="/list" component={ListView} />
         <Route path="/listing/:id" component={ListingDetails} />
         <Route path="/dashboard" component={Dashboard} />
+        <Route path="/help" component={InfoPage} />
+        <Route path="/contact" component={InfoPage} />
+        <Route path="/faq" component={InfoPage} />
+        <Route path="/privacy" component={InfoPage} />
+        <Route path="/terms" component={InfoPage} />
+        <Route path="/500" component={ServerError} />
         <Route component={NotFound} />
       </Switch>
     </Suspense>
@@ -59,9 +61,11 @@ function SessionExpiryNotifier() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <SessionExpiryNotifier />
-      <Toaster />
-      <Router />
+      <AppErrorBoundary>
+        <SessionExpiryNotifier />
+        <Toaster />
+        <Router />
+      </AppErrorBoundary>
     </QueryClientProvider>
   );
 }

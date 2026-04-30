@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { SlidersHorizontal } from "lucide-react";
 import { useSearchParams } from "wouter";
 import { api } from "@/lib/api";
+import { ErrorState, getErrorMessage } from "@/components/error-state";
 import type { Listing } from "@shared/schema";
 
 const categoryFilters = [
@@ -22,7 +23,11 @@ export default function ListView() {
   const PAGE_SIZE = 24;
   const [searchParams] = useSearchParams();
   const searchQuery = searchParams.get("q") ?? "";
-  const { data: discovery } = useQuery({
+  const {
+    data: discovery,
+    error: discoveryError,
+    refetch: refetchDiscovery,
+  } = useQuery({
     queryKey: ["discovery"],
     queryFn: api.getDiscovery,
   });
@@ -60,7 +65,13 @@ export default function ListView() {
     setPage(1);
   }, [filters]);
 
-  const { data: listingsPage, isLoading, isFetching } = useQuery({
+  const {
+    data: listingsPage,
+    isLoading,
+    isFetching,
+    error: listingsError,
+    refetch: refetchListings,
+  } = useQuery({
     queryKey: ["listings", "paged", filters, page],
     queryFn: () => api.getListingsPage({ filters, page, pageSize: PAGE_SIZE }),
   });
@@ -72,6 +83,24 @@ export default function ListView() {
   return (
     <Layout>
       <div className="container mx-auto px-4 md:px-6">
+        {listingsError || discoveryError ? (
+          <ErrorState
+            code="500"
+            title="Listings unavailable"
+            description={getErrorMessage(
+              listingsError ?? discoveryError,
+              "The listing catalog could not be loaded.",
+            )}
+            onAction={() => {
+              void refetchListings();
+              void refetchDiscovery();
+            }}
+            backHref="/"
+            backLabel="Open Map"
+          />
+        ) : null}
+        {!listingsError && !discoveryError ? (
+          <>
         <div className="mb-10 md:mb-14 relative">
           <div className="absolute -top-8 right-0 text-[15vw] font-display font-bold opacity-[0.03] select-none pointer-events-none leading-none hidden lg:block">
             SEARCH
@@ -286,6 +315,8 @@ export default function ListView() {
               Next
             </button>
           </div>
+        ) : null}
+          </>
         ) : null}
       </div>
     </Layout>
