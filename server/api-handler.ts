@@ -1,6 +1,6 @@
 import "../env";
 import type { Request, Response } from "express";
-import { bootstrapApp } from "../server/app";
+import { bootstrapApp } from "./app";
 
 let appPromise: Promise<import("express").Express> | null = null;
 
