@@ -9,6 +9,7 @@ import {
   listingFiltersSchema,
 } from "@shared/schema";
 import { StorageError, storage } from "./storage";
+import { getSupabaseAnonKey, getSupabaseUrl } from "./supabase-config";
 import {
   bookingRequestSchema,
   calculateBookingTotal,
@@ -28,12 +29,8 @@ export async function registerRoutes(
   app: Express,
 ): Promise<Server> {
   app.get("/api/config/public", (_req, res) => {
-    const supabaseUrl =
-      process.env.SUPABASE_URL ?? process.env.EXPO_PUBLIC_SUPABASE_URL ?? null;
-    const supabaseAnonKey =
-      process.env.SUPABASE_ANON_KEY ??
-      process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ??
-      null;
+    const supabaseUrl = getSupabaseUrl() ?? null;
+    const supabaseAnonKey = getSupabaseAnonKey() ?? null;
 
     res.json({
       configured: Boolean(supabaseUrl && supabaseAnonKey),

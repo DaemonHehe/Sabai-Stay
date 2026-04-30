@@ -43,6 +43,11 @@ import {
 } from "@shared/schema";
 import { seedListings } from "./seed-data";
 import {
+  getSupabaseAnonKey,
+  getSupabaseServerKey,
+  getSupabaseUrl,
+} from "./supabase-config";
+import {
   asAppUserRole,
   calculateOwnerAnalyticsFrom,
   paginateArray,
@@ -177,9 +182,9 @@ function shouldAllowMemoryFallback() {
 }
 
 function getSupabaseConfig() {
-  const url = process.env.SUPABASE_URL ?? process.env.EXPO_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const key = serviceRoleKey;
+  const url = getSupabaseUrl();
+  const serviceRoleKey = getSupabaseServerKey();
+  const key = serviceRoleKey ?? getSupabaseAnonKey();
 
   if (!url || !key) {
     return null;
@@ -188,7 +193,7 @@ function getSupabaseConfig() {
   return {
     url,
     key,
-    usingServiceRole: true,
+    usingServiceRole: Boolean(serviceRoleKey),
   };
 }
 
@@ -1416,8 +1421,19 @@ class SupabaseStorage implements IStorage {
     throwSupabaseError(error);
 
     if ((count ?? 0) > 0) {
+      if (!this.usingServiceRole) {
+        return;
+      }
+
       await this.ensureSeedListingOwners();
       return;
+    }
+
+    if (!this.usingServiceRole) {
+      throw new StorageError(
+        "Supabase has no listings and SUPABASE_SERVICE_ROLE_KEY is not configured, so seed data cannot be created.",
+        "SUPABASE_READONLY_EMPTY",
+      );
     }
 
     const discovery = await this.getDiscoveryData();
@@ -2580,7 +2596,8 @@ async function createSupabaseStorage(): Promise<IStorage | null> {
   const config = getSupabaseConfig();
 
   if (!config) {
-  const missingConfigMessage = "SUPABASE_URL plus SUPABASE_SERVICE_ROLE_KEY is required for persistent server storage.";
+    const missingConfigMessage =
+      "Supabase URL plus SUPABASE_SERVICE_ROLE_KEY or SUPABASE_ANON_KEY is required for server storage.";
     if (!allowMemoryFallback) {
       throw new Error(missingConfigMessage);
     }
@@ -2588,15 +2605,14 @@ async function createSupabaseStorage(): Promise<IStorage | null> {
     return null;
   }
 
-  const supabase = createClient(config.url, config.key, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-      detectSessionInUrl: false,
-    },
-  });
-
   try {
+    const supabase = createClient(config.url, config.key, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+      },
+    });
     const storage = new SupabaseStorage(supabase, config.usingServiceRole);
     const { error } = await supabase.from("app_users").select("id").limit(1);
     throwSupabaseError(error);

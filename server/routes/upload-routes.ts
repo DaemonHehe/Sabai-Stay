@@ -5,6 +5,11 @@ import { z } from "zod";
 import { formatZodError, requireAuth, requireRole } from "./route-helpers";
 import { storage } from "../storage";
 import { logEvent } from "../observability/logger";
+import {
+  getSupabaseAnonKey,
+  getSupabaseServerKey,
+  getSupabaseUrl,
+} from "../supabase-config";
 
 const LISTING_IMAGE_CONTENT_TYPES = new Set([
   "image/jpeg",
@@ -44,12 +49,8 @@ function getUploadClient() {
     return uploadClient;
   }
 
-  const supabaseUrl =
-    process.env.SUPABASE_URL ?? process.env.EXPO_PUBLIC_SUPABASE_URL;
-  const supabaseKey =
-    process.env.SUPABASE_SERVICE_ROLE_KEY ??
-    process.env.SUPABASE_ANON_KEY ??
-    process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+  const supabaseUrl = getSupabaseUrl();
+  const supabaseKey = getSupabaseServerKey() ?? getSupabaseAnonKey();
 
   if (!supabaseUrl || !supabaseKey) {
     uploadClient = null;
@@ -338,4 +339,3 @@ export function registerUploadRoutes(app: Express) {
     }
   });
 }
-

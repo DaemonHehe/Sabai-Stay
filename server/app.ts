@@ -7,6 +7,7 @@ import rateLimit from "express-rate-limit";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { initializeStorage } from "./storage";
+import { getSupabaseUrl } from "./supabase-config";
 import { trackError } from "./observability/error-tracker";
 import { logEvent } from "./observability/logger";
 import { getMetricsSnapshot, recordHttpMetric } from "./observability/metrics";
@@ -86,8 +87,7 @@ function getHelmetConfig() {
     } as const;
   }
 
-  const supabaseUrl =
-    process.env.SUPABASE_URL ?? process.env.EXPO_PUBLIC_SUPABASE_URL ?? "";
+  const supabaseUrl = getSupabaseUrl() ?? "";
   let supabaseOrigin = "";
   try {
     supabaseOrigin = supabaseUrl ? new URL(supabaseUrl).origin : "";
