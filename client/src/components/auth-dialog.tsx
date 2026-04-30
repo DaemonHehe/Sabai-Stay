@@ -80,6 +80,11 @@ function ModalShell({
   children: React.ReactNode;
 }) {
   const panelRef = useRef<HTMLDivElement | null>(null);
+  const onCloseRef = useRef(onClose);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   useEffect(() => {
     if (!open) {
@@ -91,7 +96,7 @@ function ModalShell({
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        onClose();
+        onCloseRef.current();
       }
     };
 
@@ -102,7 +107,7 @@ function ModalShell({
       document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", onKeyDown);
     };
-  }, [onClose, open]);
+  }, [open]);
 
   if (!open) {
     return null;

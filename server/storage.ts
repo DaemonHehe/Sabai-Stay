@@ -178,6 +178,10 @@ function shouldAllowMemoryFallback() {
     return isTruthy(process.env.ALLOW_MEMORY_FALLBACK);
   }
 
+  if (process.env.VERCEL === "1") {
+    return true;
+  }
+
   return process.env.NODE_ENV !== "production";
 }
 
