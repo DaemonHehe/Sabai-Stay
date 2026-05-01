@@ -162,8 +162,16 @@ export function AuthDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const { toast } = useToast();
-  const { isConfigured, isLoading, user, profile, signIn, signUp, signOut } =
-    useAuth();
+  const {
+    isConfigured,
+    isLoading,
+    user,
+    profile,
+    signIn,
+    signUp,
+    sendPasswordResetEmail,
+    signOut,
+  } = useAuth();
   const [activeTab, setActiveTab] = useState<"sign-in" | "sign-up">("sign-in");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [signInData, setSignInData] = useState({
@@ -227,6 +235,38 @@ export function AuthDialog({
       toast({
         title: "Sign-in failed",
         description: error instanceof Error ? error.message : "Unable to sign in.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function handlePasswordResetRequest() {
+    const email = signInData.email.trim();
+
+    if (!email) {
+      toast({
+        title: "Email required",
+        description: "Enter your account email first, then request a reset link.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      await sendPasswordResetEmail(email);
+      toast({
+        title: "Check your inbox",
+        description: "We sent a password reset link if that email has an account.",
+      });
+    } catch (error) {
+      toast({
+        title: "Reset link failed",
+        description:
+          error instanceof Error ? error.message : "Unable to send a reset link.",
         variant: "destructive",
       });
     } finally {
@@ -515,7 +555,17 @@ export function AuthDialog({
               </div>
 
               <div>
-                <FieldLabel htmlFor="sign-in-password">Password</FieldLabel>
+                <div className="flex items-center justify-between gap-3">
+                  <FieldLabel htmlFor="sign-in-password">Password</FieldLabel>
+                  <button
+                    type="button"
+                    onClick={handlePasswordResetRequest}
+                    disabled={isSubmitting || isLoading}
+                    className="text-xs font-medium text-primary underline-offset-4 hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Forgot password?
+                  </button>
+                </div>
                 <Input
                   id="sign-in-password"
                   type="password"

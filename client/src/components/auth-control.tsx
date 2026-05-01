@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { User } from "lucide-react";
 
 const AuthDialog = lazy(() =>
@@ -9,6 +9,22 @@ const AuthDialog = lazy(() =>
 
 export function AuthControl() {
   const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    const handleOpenAuthDialog = () => {
+      setOpen(true);
+    };
+
+    if (window.sessionStorage.getItem("sabai:open-auth-dialog") === "true") {
+      window.sessionStorage.removeItem("sabai:open-auth-dialog");
+      setOpen(true);
+    }
+
+    window.addEventListener("sabai:open-auth-dialog", handleOpenAuthDialog);
+    return () => {
+      window.removeEventListener("sabai:open-auth-dialog", handleOpenAuthDialog);
+    };
+  }, []);
 
   return (
     <>

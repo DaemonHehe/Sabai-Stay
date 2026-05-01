@@ -1,0 +1,126 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1220" viewBox="0 0 1800 1220" role="img" aria-labelledby="title desc">
+  <title id="title">Sabai Stay Database Schema (Ultra-Simple)</title>
+  <desc id="desc">Ultra-simple academic UML-style database schema for core Sabai Stay tables.</desc>
+  <defs>
+    <style>
+      .bg { fill: #f8fafc; }
+      .title { font: 700 34px 'Segoe UI', Arial, sans-serif; fill: #0f172a; }
+      .subtitle { font: 400 16px 'Segoe UI', Arial, sans-serif; fill: #475569; }
+      .uml { fill: #ffffff; stroke: #64748b; stroke-width: 1.8; rx: 12; ry: 12; }
+      .divider { stroke: #64748b; stroke-width: 1.6; }
+      .cls { font: 700 17px 'Segoe UI', Arial, sans-serif; fill: #0f172a; }
+      .attr { font: 12px 'Consolas', 'Courier New', monospace; fill: #334155; }
+      .pk { fill: #2563eb; font-weight: 700; }
+      .fk { fill: #0f766e; font-weight: 700; }
+      .rel { fill: none; stroke: #475569; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; marker-end: url(#arrow); }
+      .label { font: 12px 'Segoe UI', Arial, sans-serif; fill: #1e293b; }
+      .note { fill: #ffffff; stroke: #cbd5e1; stroke-width: 1.4; rx: 16; ry: 16; }
+      .note-text { font: 13px 'Segoe UI', Arial, sans-serif; fill: #334155; }
+    </style>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#475569" />
+    </marker>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="1800" height="1220" />
+  <text class="title" x="40" y="58">Sabai Stay Database Schema</text>
+  <text class="subtitle" x="40" y="88">Ultra-simple academic UML-style view of core tables and foreign-key directions.</text>
+
+  <g transform="translate(140 180)">
+    <rect class="uml" width="360" height="128" />
+    <line class="divider" x1="0" y1="42" x2="360" y2="42" />
+    <text class="cls" x="20" y="28">app_users</text>
+    <text class="attr" x="20" y="68"><tspan class="pk">PK</tspan> id : uuid</text>
+    <text class="attr" x="20" y="90">role : text</text>
+    <text class="attr" x="20" y="112">full_name : text</text>
+  </g>
+
+  <g transform="translate(620 180)">
+    <rect class="uml" width="320" height="110" />
+    <line class="divider" x1="0" y1="42" x2="320" y2="42" />
+    <text class="cls" x="20" y="28">universities</text>
+    <text class="attr" x="20" y="68"><tspan class="pk">PK</tspan> id : uuid</text>
+    <text class="attr" x="20" y="90">name : text</text>
+  </g>
+
+  <g transform="translate(1120 180)">
+    <rect class="uml" width="420" height="186" />
+    <line class="divider" x1="0" y1="42" x2="420" y2="42" />
+    <text class="cls" x="20" y="28">listings</text>
+    <text class="attr" x="20" y="68"><tspan class="pk">PK</tspan> id : uuid</text>
+    <text class="attr" x="20" y="90"><tspan class="fk">FK</tspan> owner_user_id : uuid</text>
+    <text class="attr" x="20" y="112"><tspan class="fk">FK</tspan> university_id : uuid</text>
+    <text class="attr" x="20" y="134">title : text</text>
+    <text class="attr" x="20" y="156">price : numeric</text>
+    <text class="attr" x="20" y="178">listing_status : text</text>
+  </g>
+
+  <g transform="translate(140 420)">
+    <rect class="uml" width="360" height="118" />
+    <line class="divider" x1="0" y1="42" x2="360" y2="42" />
+    <text class="cls" x="20" y="28">student_profiles</text>
+    <text class="attr" x="20" y="68"><tspan class="pk">PK</tspan> <tspan class="fk">FK</tspan> user_id : uuid</text>
+    <text class="attr" x="20" y="90"><tspan class="fk">FK</tspan> university_id : uuid</text>
+    <text class="attr" x="20" y="112">verification_status : text</text>
+  </g>
+
+  <g transform="translate(620 420)">
+    <rect class="uml" width="320" height="102" />
+    <line class="divider" x1="0" y1="42" x2="320" y2="42" />
+    <text class="cls" x="20" y="28">owner_profiles</text>
+    <text class="attr" x="20" y="68"><tspan class="pk">PK</tspan> <tspan class="fk">FK</tspan> user_id : uuid</text>
+    <text class="attr" x="20" y="90">verification_status : text</text>
+  </g>
+
+  <g transform="translate(1120 420)">
+    <rect class="uml" width="420" height="170" />
+    <line class="divider" x1="0" y1="42" x2="420" y2="42" />
+    <text class="cls" x="20" y="28">bookings</text>
+    <text class="attr" x="20" y="68"><tspan class="pk">PK</tspan> id : uuid</text>
+    <text class="attr" x="20" y="90"><tspan class="fk">FK</tspan> listing_id : uuid</text>
+    <text class="attr" x="20" y="112"><tspan class="fk">FK</tspan> student_user_id : uuid</text>
+    <text class="attr" x="20" y="134"><tspan class="fk">FK</tspan> owner_user_id : uuid</text>
+    <text class="attr" x="20" y="156">status : text</text>
+  </g>
+
+  <g transform="translate(1120 680)">
+    <rect class="uml" width="420" height="120" />
+    <line class="divider" x1="0" y1="42" x2="420" y2="42" />
+    <text class="cls" x="20" y="28">contracts</text>
+    <text class="attr" x="20" y="68"><tspan class="pk">PK</tspan> id : uuid</text>
+    <text class="attr" x="20" y="90"><tspan class="fk">FK</tspan> booking_id : uuid</text>
+    <text class="attr" x="20" y="112"><tspan class="fk">FK</tspan> listing_id : uuid</text>
+  </g>
+
+  <path class="rel" d="M320 420 V308" />
+  <text class="label" x="332" y="378">user_id</text>
+
+  <path class="rel" d="M500 470 H620" />
+  <text class="label" x="532" y="460">university_id</text>
+
+  <path class="rel" d="M620 470 H500" />
+  <text class="label" x="536" y="486">user_id</text>
+
+  <path class="rel" d="M1120 250 H940" />
+  <text class="label" x="998" y="240">university_id</text>
+
+  <path class="rel" d="M1120 280 H500" />
+  <text class="label" x="804" y="270">owner_user_id</text>
+
+  <path class="rel" d="M1330 420 V366" />
+  <text class="label" x="1342" y="396">listing_id</text>
+
+  <path class="rel" d="M1120 510 H900 V308 H500" />
+  <text class="label" x="906" y="326">student_user_id / owner_user_id</text>
+
+  <path class="rel" d="M1330 680 V590" />
+  <text class="label" x="1342" y="640">booking_id</text>
+
+  <path class="rel" d="M1120 740 H1060 V366 H1120" />
+  <text class="label" x="1068" y="548">listing_id</text>
+
+  <rect class="note" x="40" y="1082" width="1720" height="96" />
+  <text class="note-text" x="64" y="1116">This diagram is intentionally simplified for academic presentation and keeps only core workflow tables.</text>
+  <text class="note-text" x="64" y="1142">Direction shows FK → referenced PK. <tspan class="pk">PK</tspan> primary key, <tspan class="fk">FK</tspan> foreign key.</text>
+</svg>
+

@@ -1,0 +1,102 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1180" viewBox="0 0 1800 1180" role="img" aria-labelledby="title desc">
+  <title id="title">Sabai Stay Booking Workflow Sequence Diagram (Ultra-Simple)</title>
+  <desc id="desc">Ultra-simple academic sequence diagram for Sabai Stay booking request and approval workflow.</desc>
+  <defs>
+    <style>
+      .bg { fill: #f8fafc; }
+      .title { font: 700 32px 'Segoe UI', Arial, sans-serif; fill: #0f172a; }
+      .subtitle { font: 400 16px 'Segoe UI', Arial, sans-serif; fill: #475569; }
+      .actor { fill: #ffffff; stroke: #64748b; stroke-width: 1.8; rx: 12; ry: 12; }
+      .name { font: 700 15px 'Segoe UI', Arial, sans-serif; fill: #0f172a; text-anchor: middle; }
+      .lifeline { fill: none; stroke: #94a3b8; stroke-width: 2.2; stroke-dasharray: 8 7; }
+      .msg { fill: none; stroke: #1f2937; stroke-width: 3; stroke-linecap: round; marker-end: url(#arrow); }
+      .ret { fill: none; stroke: #1d4ed8; stroke-width: 2.6; stroke-dasharray: 8 6; stroke-linecap: round; marker-end: url(#arrowBlue); }
+      .label { font: 12px 'Segoe UI', Arial, sans-serif; fill: #0f172a; }
+      .phase { fill: #ffffff; stroke: #94a3b8; stroke-width: 1.6; rx: 10; ry: 10; }
+      .phase-text { font: 700 15px 'Segoe UI', Arial, sans-serif; fill: #1d4ed8; }
+      .note { fill: #ffffff; stroke: #f59e0b; stroke-width: 1.6; rx: 12; ry: 12; }
+      .note-text { font: 12px 'Segoe UI', Arial, sans-serif; fill: #92400e; }
+    </style>
+    <marker id="arrow" markerWidth="18" markerHeight="18" refX="14" refY="7" orient="auto">
+      <path d="M0,0 L14,7 L0,14 Z" fill="#1f2937" />
+    </marker>
+    <marker id="arrowBlue" markerWidth="16" markerHeight="16" refX="12" refY="6" orient="auto">
+      <path d="M0,0 L12,6 L0,12 Z" fill="#1d4ed8" />
+    </marker>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="1800" height="1180" />
+  <text class="title" x="40" y="58">Sabai Stay Booking Workflow Sequence Diagram</text>
+  <text class="subtitle" x="40" y="88">Ultra-simple academic flow from request submission to owner approval update.</text>
+
+  <g transform="translate(100 110)">
+    <rect class="actor" width="160" height="62" />
+    <text class="name" x="80" y="38">Student</text>
+  </g>
+  <g transform="translate(420 110)">
+    <rect class="actor" width="170" height="62" />
+    <text class="name" x="85" y="38">Booking UI</text>
+  </g>
+  <g transform="translate(760 110)">
+    <rect class="actor" width="150" height="62" />
+    <text class="name" x="75" y="38">API</text>
+  </g>
+  <g transform="translate(1060 110)">
+    <rect class="actor" width="160" height="62" />
+    <text class="name" x="80" y="38">Database</text>
+  </g>
+  <g transform="translate(1370 110)">
+    <rect class="actor" width="220" height="62" />
+    <text class="name" x="110" y="38">Owner Dashboard</text>
+  </g>
+
+  <line class="lifeline" x1="180" y1="172" x2="180" y2="1040" />
+  <line class="lifeline" x1="505" y1="172" x2="505" y2="1040" />
+  <line class="lifeline" x1="835" y1="172" x2="835" y2="1040" />
+  <line class="lifeline" x1="1140" y1="172" x2="1140" y2="1040" />
+  <line class="lifeline" x1="1480" y1="172" x2="1480" y2="1040" />
+
+  <rect class="phase" x="70" y="210" width="1660" height="36" />
+  <text class="phase-text" x="92" y="234">Phase 1: Student submits booking request</text>
+
+  <line class="msg" x1="180" y1="280" x2="505" y2="280" />
+  <text class="label" x="218" y="270">1. Submit dates and note</text>
+
+  <line class="msg" x1="505" y1="330" x2="835" y2="330" />
+  <text class="label" x="550" y="320">2. POST /api/bookings (listingId, dates, token)</text>
+
+  <line class="msg" x1="835" y1="380" x2="1140" y2="380" />
+  <text class="label" x="874" y="370">3. Validate + INSERT booking (status=requested)</text>
+
+  <line class="ret" x1="1140" y1="430" x2="835" y2="430" />
+  <text class="label" x="884" y="420">4. Booking row created</text>
+
+  <line class="ret" x1="835" y1="480" x2="505" y2="480" />
+  <text class="label" x="554" y="470">5. 201 Created + booking status</text>
+
+  <line class="ret" x1="505" y1="530" x2="180" y2="530" />
+  <text class="label" x="220" y="520">6. Show "Pending owner approval"</text>
+
+  <rect class="phase" x="70" y="590" width="1660" height="36" />
+  <text class="phase-text" x="92" y="614">Phase 2: Owner updates booking workflow</text>
+
+  <line class="msg" x1="1480" y1="660" x2="835" y2="660" />
+  <text class="label" x="1044" y="650">7. PATCH /api/bookings/:id/status</text>
+
+  <line class="msg" x1="835" y1="710" x2="1140" y2="710" />
+  <text class="label" x="876" y="700">8. UPDATE booking + INSERT timeline/notification</text>
+
+  <line class="ret" x1="1140" y1="760" x2="835" y2="760" />
+  <text class="label" x="884" y="750">9. Updated workflow state</text>
+
+  <line class="ret" x1="835" y1="810" x2="1480" y2="810" />
+  <text class="label" x="1064" y="800">10. Dashboard refresh with new status</text>
+
+  <line class="msg" x1="835" y1="860" x2="505" y2="860" />
+  <text class="label" x="556" y="850">11. Status event for student view</text>
+
+  <line class="ret" x1="505" y1="910" x2="180" y2="910" />
+  <text class="label" x="220" y="900">12. Student sees approved/rejected/confirmed</text>
+
+</svg>
+

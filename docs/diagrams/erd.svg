@@ -1,0 +1,148 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1150" viewBox="0 0 1800 1150" role="img" aria-labelledby="title desc">
+  <title id="title">Sabai Stay ERD (Ultra-Simple)</title>
+  <desc id="desc">Ultra-simple academic ERD for Sabai Stay with core entities and clear cardinality arrows.</desc>
+  <defs>
+    <style>
+      .bg { fill: #f8fafc; }
+      .title { font: 700 34px 'Segoe UI', Arial, sans-serif; fill: #0f172a; }
+      .subtitle { font: 400 16px 'Segoe UI', Arial, sans-serif; fill: #475569; }
+      .entity-box { fill: #ffffff; stroke: #64748b; stroke-width: 1.8; rx: 12; ry: 12; }
+      .divider { stroke: #64748b; stroke-width: 1.6; }
+      .entity { font: 700 17px 'Segoe UI', Arial, sans-serif; fill: #0f172a; }
+      .attr { font: 12px 'Consolas', 'Courier New', monospace; fill: #334155; }
+      .rel { fill: none; stroke: #1f2937; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; marker-end: url(#arrow); }
+      .mult { font: 700 13px 'Consolas', 'Courier New', monospace; fill: #1d4ed8; }
+      .label { font: 12px 'Segoe UI', Arial, sans-serif; fill: #0f172a; }
+      .note { fill: #ffffff; stroke: #cbd5e1; stroke-width: 1.4; rx: 16; ry: 16; }
+      .note-text { font: 13px 'Segoe UI', Arial, sans-serif; fill: #334155; }
+    </style>
+    <marker id="arrow" markerWidth="18" markerHeight="18" refX="14" refY="7" orient="auto">
+      <path d="M0,0 L14,7 L0,14 Z" fill="#1f2937" />
+    </marker>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="1800" height="1150" />
+  <text class="title" x="40" y="58">Sabai Stay ERD</text>
+  <text class="subtitle" x="40" y="88">Ultra-simple academic ERD of core entities and relationship cardinalities.</text>
+
+  <g transform="translate(120 150)">
+    <rect class="entity-box" width="340" height="120" />
+    <line class="divider" x1="0" y1="42" x2="340" y2="42" />
+    <text class="entity" x="20" y="28">AppUser</text>
+    <text class="attr" x="20" y="68">id : uuid</text>
+    <text class="attr" x="20" y="90">role : text</text>
+    <text class="attr" x="20" y="112">fullName : text</text>
+  </g>
+
+  <g transform="translate(120 350)">
+    <rect class="entity-box" width="340" height="110" />
+    <line class="divider" x1="0" y1="42" x2="340" y2="42" />
+    <text class="entity" x="20" y="28">StudentProfile</text>
+    <text class="attr" x="20" y="68">userId : uuid</text>
+    <text class="attr" x="20" y="90">universityId : uuid</text>
+  </g>
+
+  <g transform="translate(120 520)">
+    <rect class="entity-box" width="340" height="100" />
+    <line class="divider" x1="0" y1="42" x2="340" y2="42" />
+    <text class="entity" x="20" y="28">OwnerProfile</text>
+    <text class="attr" x="20" y="68">userId : uuid</text>
+    <text class="attr" x="20" y="90">verificationStatus : text</text>
+  </g>
+
+  <g transform="translate(650 150)">
+    <rect class="entity-box" width="340" height="110" />
+    <line class="divider" x1="0" y1="42" x2="340" y2="42" />
+    <text class="entity" x="20" y="28">University</text>
+    <text class="attr" x="20" y="68">id : uuid</text>
+    <text class="attr" x="20" y="90">name : text</text>
+  </g>
+
+  <g transform="translate(1180 180)">
+    <rect class="entity-box" width="360" height="160" />
+    <line class="divider" x1="0" y1="42" x2="360" y2="42" />
+    <text class="entity" x="20" y="28">Listing</text>
+    <text class="attr" x="20" y="68">id : uuid</text>
+    <text class="attr" x="20" y="90">ownerUserId : uuid</text>
+    <text class="attr" x="20" y="112">universityId : uuid</text>
+    <text class="attr" x="20" y="134">price, roomType</text>
+    <text class="attr" x="20" y="156">listingStatus : text</text>
+  </g>
+
+  <g transform="translate(1180 470)">
+    <rect class="entity-box" width="360" height="160" />
+    <line class="divider" x1="0" y1="42" x2="360" y2="42" />
+    <text class="entity" x="20" y="28">Booking</text>
+    <text class="attr" x="20" y="68">id : uuid</text>
+    <text class="attr" x="20" y="90">listingId : uuid</text>
+    <text class="attr" x="20" y="112">studentUserId, ownerUserId</text>
+    <text class="attr" x="20" y="134">status : text</text>
+    <text class="attr" x="20" y="156">totalPrice : numeric</text>
+  </g>
+
+  <g transform="translate(1180 730)">
+    <rect class="entity-box" width="360" height="110" />
+    <line class="divider" x1="0" y1="42" x2="360" y2="42" />
+    <text class="entity" x="20" y="28">Contract</text>
+    <text class="attr" x="20" y="68">id : uuid</text>
+    <text class="attr" x="20" y="90">bookingId, listingId</text>
+  </g>
+
+  <g transform="translate(650 760)">
+    <rect class="entity-box" width="340" height="100" />
+    <line class="divider" x1="0" y1="42" x2="340" y2="42" />
+    <text class="entity" x="20" y="28">Notification</text>
+    <text class="attr" x="20" y="68">id : uuid</text>
+    <text class="attr" x="20" y="90">userId : uuid?</text>
+  </g>
+
+  <path class="rel" d="M290 270 V350" />
+  <text class="mult" x="302" y="306">1</text>
+  <text class="mult" x="302" y="340">0..1</text>
+  <text class="label" x="318" y="326">has student profile</text>
+
+  <path class="rel" d="M340 270 V520" />
+  <text class="mult" x="352" y="402">1</text>
+  <text class="mult" x="352" y="508">0..1</text>
+  <text class="label" x="368" y="458">has owner profile</text>
+
+  <path class="rel" d="M650 220 H520 V405 H460" />
+  <text class="mult" x="662" y="210">1</text>
+  <text class="mult" x="472" y="393">0..*</text>
+  <text class="label" x="534" y="242">has students</text>
+
+  <path class="rel" d="M990 220 H1180" />
+  <text class="mult" x="1002" y="210">1</text>
+  <text class="mult" x="1152" y="210">0..*</text>
+  <text class="label" x="1058" y="198">has listings</text>
+
+  <path class="rel" d="M460 200 H1120 V260 H1180" />
+  <text class="mult" x="472" y="190">1</text>
+  <text class="mult" x="1152" y="248">0..*</text>
+  <text class="label" x="850" y="188">owns listings</text>
+
+  <path class="rel" d="M1360 340 V470" />
+  <text class="mult" x="1372" y="398">1</text>
+  <text class="mult" x="1372" y="458">0..*</text>
+  <text class="label" x="1388" y="430">has bookings</text>
+
+  <path class="rel" d="M460 240 H1080 V550 H1180" />
+  <text class="mult" x="472" y="230">1</text>
+  <text class="mult" x="1152" y="538">0..*</text>
+  <text class="label" x="1092" y="430">makes bookings</text>
+
+  <path class="rel" d="M1360 630 V730" />
+  <text class="mult" x="1372" y="674">1</text>
+  <text class="mult" x="1372" y="718">0..1</text>
+  <text class="label" x="1388" y="698">may create contract</text>
+
+  <path class="rel" d="M250 270 V810 H650" />
+  <text class="mult" x="262" y="540">1</text>
+  <text class="mult" x="622" y="800">0..*</text>
+  <text class="label" x="270" y="792">receives notifications</text>
+
+  <rect class="note" x="40" y="1040" width="1720" height="82" />
+  <text class="note-text" x="64" y="1072">This ERD is intentionally simplified for academic presentation. It focuses on core entities and primary cardinalities.</text>
+  <text class="note-text" x="64" y="1098">Recommended caption: "Ultra-simple ERD of Sabai Stay core entities and relationships."</text>
+</svg>
+

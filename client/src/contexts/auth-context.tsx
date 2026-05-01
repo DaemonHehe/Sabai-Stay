@@ -42,6 +42,8 @@ type AuthContextValue = AuthState & {
   user: User | null;
   signIn: (input: SignInInput) => Promise<void>;
   signUp: (input: SignUpInput) => Promise<SignUpResult>;
+  sendPasswordResetEmail: (email: string) => Promise<void>;
+  updatePassword: (password: string) => Promise<void>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<AuthProfile | null>;
 };
@@ -282,6 +284,32 @@ async function signUp(input: SignUpInput): Promise<SignUpResult> {
   };
 }
 
+async function sendPasswordResetEmail(email: string) {
+  await initializeAuth();
+
+  const client = await requireSupabaseBrowserClient();
+  const { error } = await client.auth.resetPasswordForEmail(email, {
+    redirectTo: `${window.location.origin}/reset-password`,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+async function updatePassword(password: string) {
+  await initializeAuth();
+
+  const client = await requireSupabaseBrowserClient();
+  const { error } = await client.auth.updateUser({
+    password,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
 async function signOut() {
   await initializeAuth();
 
@@ -328,6 +356,8 @@ export function useAuth(): AuthContextValue {
     user: state.session?.user ?? null,
     signIn,
     signUp,
+    sendPasswordResetEmail,
+    updatePassword,
     signOut,
     refreshProfile,
   };
